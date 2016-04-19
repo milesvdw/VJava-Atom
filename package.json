@@ -2,7 +2,7 @@
   "name": "variational-java",
   "main": "./lib/variational-java",
   "version": "0.0.0",
-  "description": "A short description of your package",
+  "description": "An editor plugin supporting Variational Java development",
   "keywords": [
   ],
   "activationCommands": {
