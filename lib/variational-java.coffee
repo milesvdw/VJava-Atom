@@ -6,8 +6,8 @@
 {CompositeDisposable} = require 'atom'
 VariationalJavaView = require './variational-java-veiw.coffee'
 CCInterface = require './cc-interface.coffee'
-ui = require './render.coffee'
-
+ui = require './UI/renderTools.coffee'
+FoldRender = require './UI/FoldRender.coffee'
 
 module.exports =
 	ccIdeView: null
@@ -47,9 +47,9 @@ module.exports =
 		parser = new CCInterface();
 
 		parser.parseVJava(text, (data) =>
-			renderers = [ui.renderFolding]
-
-			ui.renderAsSequence(data, renderers)
+			foldRender = new FoldRender(atom.workspace.getActiveTextEditor());
+			foldRender.initEvents();
+			foldRender.foldChoices(data);
 		)
 
 		# command = new ConsoleCommand();
