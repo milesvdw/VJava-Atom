@@ -50,11 +50,11 @@ h1 {
 }
 
 .edit-locked {
-    color: red;
+    background-color: red;
 }
 
 .edit-enabled {
-    color: green;
+    background-color: green;
 }
 
 .edit:hover {
@@ -93,24 +93,28 @@ h1 {
     margin-top: 8px;
 }
 
-// .left-choice {
-// 		color: spin(desaturate(@text-color, 50%), 120)
-// }
-.left-choice {
-		color: spin(@text-color, 120)
+atom-text-editor::shadow .unselected {
+	color: @text-color
 }
 
-// .right-choice {
-// 	color: spin(desaturate(@text-color, 50%), 240)
-// }
+atom-text-editor::shadow .left-choice-selected {
+		color: spin(@text-color, 120);
+		font-weight: bold;
+}
 
-.right-choice {
+atom-text-editor::shadow .right-choice-selected {
 		color: spin(@text-color, 240);
+		font-weight: bold;
 }
 
-.unselected {
-		color: @text-color
+atom-text-editor::shadow .left-choice {
+ 		color: spin(desaturate(@text-color, 10%), 120)
 }
+
+atom-text-editor::shadow .right-choice {
+	color: spin(desaturate(@text-color, 10%), 240)
+}
+
 atom-text-editor::shadow .dimension-marker-HI-left {
 
     background: linear-gradient( 90deg, grey, #284777 8%, #0462f9 16%);

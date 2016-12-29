@@ -1,5 +1,5 @@
 $ = require 'jquery'
-
+getMaxRowRange = (require './renderTools.coffee').getMaxRowRange
 ###
 Keeps the state of where folds are and offers a handler to fold lines on gutter click.
 ###
@@ -75,11 +75,5 @@ class FoldRender
 	###
 	foldNode: (node) ->
 			#TODO: this might be able to be described more cleanly by a coffescript thing.
-			maxRow = 0
-			minRow = Number.MAX_SAFE_INTEGER
-			for element in node
-				if element.span.start[0] < minRow
-					minRow = element.span.start[0]
-				if element.span.end[0] > maxRow
-					maxRow = element.span.end[0]
-			@setFoldable([[minRow, 0], [maxRow, 0]])
+			rowRange = getMaxRowRange(node);
+			@setFoldable([[rowRange.min, 0], [rowRange.max, 0]])

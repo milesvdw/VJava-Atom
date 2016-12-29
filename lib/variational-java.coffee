@@ -8,6 +8,7 @@ VariationalJavaView = require './variational-java-veiw.coffee'
 CCInterface = require './cc-interface.coffee'
 ui = require './UI/renderTools.coffee'
 FoldRender = require './UI/FoldRender.coffee'
+ColorRender = require './UI/ColorRender.coffee'
 
 module.exports =
 	ccIdeView: null
@@ -47,9 +48,16 @@ module.exports =
 		parser = new CCInterface();
 
 		parser.parseVJava(text, (data) =>
-			foldRender = new FoldRender(atom.workspace.getActiveTextEditor());
+			editor = atom.workspace.getActiveTextEditor();
+
+			foldRender = new FoldRender(editor);
 			foldRender.initEvents();
 			foldRender.foldChoices(data);
+
+			colorRender = new ColorRender(editor)
+			colorRender.initEvents();
+			colorRender.renderColor(data);
+
 		)
 
 		# command = new ConsoleCommand();
