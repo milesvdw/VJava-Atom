@@ -1,5 +1,6 @@
 {
   "atom-workspace": {
-    "ctrl-alt-o": "variational-java:toggle"
+    "ctrl-alt-o": "variational-java:toggle",
+    "ctrl-i": "variational-java:add-choice-segment"
   }
 }
