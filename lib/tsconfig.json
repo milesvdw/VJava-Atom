@@ -1,0 +1,11 @@
+{
+	"compileOnSave": true,
+	"compilerOptions": {
+		"alwaysStrict": true,
+		"strictNullChecks": true,
+		"allowSyntheticDefaultImports": true,
+		"module": "es6",
+		"target": "es6",
+		"sourceMap": true
+	}
+}

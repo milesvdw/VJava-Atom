@@ -13,6 +13,9 @@
     "atom": ">=1.0.0 <2.0.0"
   },
   "dependencies": {
-    "jquery": "^2.2.3"
+    "@types/atom": "0.0.35",
+    "@types/q": "0.0.32",
+    "jquery": "^2.2.4",
+    "spectrum-colorpicker": "^1.8.0"
   }
 }

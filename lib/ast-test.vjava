@@ -1,0 +1,4 @@
+foobar
+#ifdef test
+foobar
+#endif

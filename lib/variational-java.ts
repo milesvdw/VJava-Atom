@@ -1,18 +1,31 @@
 'use babel';
-'use strict';
 
-import VariationalJavaView from './variational-java-view';
+declare module 'atom' {
+  class CompositeDisposable {
+    add(command: any): void;
+  }
+}
+
+import $ from 'jquery';
+import 'spectrum-colorpicker';
 import { CompositeDisposable } from 'atom';
 import { exec } from 'child_process';
-import './spectrum';
 
-window.$ = window.jQuery = require('jquery');
+// ----------------------------------------------------------------------------
 
-if (!Array.prototype.last){
-    Array.prototype.last = function(){
-        return this[this.length - 1];
-    };
-};
+declare global {
+  interface Array<T> {
+    last(): T | undefined;
+  }
+}
+
+if (!Array.prototype.last) {
+  Array.prototype.last = function() {
+    return this[this.length - 1];
+  }
+}
+
+// ----------------------------------------------------------------------------
 
 //declared out here so that they may be accessed from the document itself
 //only for debugging purposes.
@@ -33,16 +46,20 @@ function rangeToSpan(range) {
   return span;
 }
 
+// ----------------------------------------------------------------------------
+
+// organize this stuff please.
 var linesRemoved = 0;
 var linesReAdded = 0;
 
-function shadeColor(hex, lum) {
+function shadeColor(hex: string, lum?: number) {
 
 	// validate hex string
 	hex = String(hex).replace(/[^0-9a-f]/gi, '');
 	if (hex.length < 6) {
 		hex = hex[0]+hex[0]+hex[1]+hex[1]+hex[2]+hex[2];
 	}
+
 	lum = lum || 0;
 
 	// convert to decimal and change luminosity
@@ -56,29 +73,32 @@ function shadeColor(hex, lum) {
 	return rgb;
 }
 
+// the heck is this state doing here?
 var rendering = false;
-var mainDivId = 'variationalJavaUI';
-var enclosingDivId = 'enclosingDivJavaUI';
-var secondaryDivId = 'variationalJavaUIButtons';
+const mainDivId = 'variationalJavaUI';
+const enclosingDivId = 'enclosingDivJavaUI';
+const secondaryDivId = 'variationalJavaUIButtons';
 
 var iconsPath = atom.packages.resolvePackagePath("variational-java") + "/icons";
 
 var vjava = {
 
-  nesting: [], //a stack represented nested dimensions
+  nesting: [], // a stack represented nested dimensions
   selections: [],
-  subscriptions: null,
   ui: {},
   doc: {},
   raw: "",
   colorpicker: {},
   dimensionColors: {},
-  activeChoices: [], //in the form of dimensionId:left|right
+  activeChoices: [], // in the form of dimensionId:left|right
   subscriptions: {},
 
-  //initialize the user interface
+  // initialize the user interface
+  // TODO: make this a function that returns an object conforming to VJavaUI
   createUI() {
 
+    console.log("Here's jQuery:");
+    console.log($);
     var mainUIElement = $(`<div id='${enclosingDivId}'><div id='${mainDivId}'></div>
                            <div id='${secondaryDivId}' class='vjava-secondary'>
                              <a href='' id='addNewDimension'><img id='addNewDimensionImg' border="0" src="${iconsPath}/add_square_button.png" width="30" height="30"/> </a>
@@ -89,13 +109,17 @@ var vjava = {
     vjava.ui.secondary = $(`#${secondaryDivId}`);
     vjava.ui.message = vjava.ui.main.find("#message");
 
-    //add listeners for ui butons
+    // consider css :hover for this...
     $("#addNewDimension").on('mouseover', function () {
       $('#addNewDimensionImg').attr('src', `${iconsPath}/add_square_button_depressed.png`);
     });
     $("#addNewDimension").on('mouseout', function () {
       $('#addNewDimensionImg').attr('src', `${iconsPath}/add_square_button.png`);
     });
+    // ---
+    // add listeners for ui buttons
+
+    // TODO: this click handler needs a name and a place to live.
     $("#addNewDimension").on('click', function () {
       var dimName = 'NEW';
 
@@ -104,6 +128,7 @@ var vjava = {
         color: '#7a2525'
       };
 
+      // goddamn, dude
       var nameDiv = $(`<div class='form-group dimension-ui-div' id='new-dimension'><h2><input id='new-dimension-name' class='native-key-bindings new-dimension-name' type='text' value='${dimName}'></h2></div>`)
 
       vjava.ui.main.append(nameDiv);
@@ -929,7 +954,7 @@ var vjava = {
     // TODO: load session from a file somewhere?
     vjava.ui.session = {};
 
-    vjava.selections = !window.$.isEmptyObject({}) ? state : [];
+    vjava.selections = !$.isEmptyObject({}) ? state : [];
 
     var activeEditor = atom.workspace.getActiveTextEditor();
 
