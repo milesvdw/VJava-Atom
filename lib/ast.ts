@@ -6,9 +6,10 @@ interface Span {
 }
 
 interface ContentNode {
-	type: "content";
+	type: "text";
 	content: string;
 	span?: Span;
+	marker?: AtomCore.IDisplayBufferMarker;
 }
 
 // TODO: consider putting more concrete syntax stuff in here so that it's easy
@@ -16,9 +17,11 @@ interface ContentNode {
 interface ChoiceNode {
 	type: "choice";
 	dimension: string;
+	color?: string;
 	left: RegionNode;
 	right: RegionNode;
 	span?: Span;
+	marker?: AtomCore.IDisplayBufferMarker;
 }
 
 // This is probably what the parser should return at the top level.
@@ -45,7 +48,7 @@ abstract class SyntaxWalker {
 	visitRegion(region: RegionNode): void {
 		for (const node of region.segments) {
 			switch (node.type) {
-			case "content":
+			case "text":
 				this.visitContent(node);
 				break;
 			case "choice":
@@ -153,7 +156,7 @@ abstract class SyntaxRewriter {
 		const rewrittenNodes: SegmentNode[] = [];
 		for (const node of doc.segments) {
 			switch (node.type) {
-			case "content":
+			case "text":
 				const newContent = this.rewriteContent(node);
 				rewrittenNodes.push(...newContent);
 				break;
@@ -178,7 +181,7 @@ class SimplifierRewriter extends SyntaxRewriter {
 	rewriteRegion(region: RegionNode): RegionNode {
 		const newSegments: SegmentNode[] = [];
 		for (const segment of region.segments) {
-			if (segment.type === "content") {
+			if (segment.type === "text") {
 				this.simplifyContent(newSegments, segment);
 			} else {
 				newSegments.push(...this.rewriteChoice(segment));
@@ -195,11 +198,11 @@ class SimplifierRewriter extends SyntaxRewriter {
 
 	simplifyContent(newSegments: SegmentNode[], contentNode: ContentNode) {
 		const last = newSegments[newSegments.length - 1];
-		if (last && last.type === "content") {
+		if (last && last.type === "text") {
 			last.content += contentNode.content;
 		} else {
 			const newSegment: ContentNode = {
-				type: "content",
+				type: "text",
 				content: contentNode.content
 			};
 			newSegments.push(newSegment);
@@ -213,11 +216,11 @@ function test() {
 		type: "region",
 		segments: [
 			{
-				type: "content",
+				type: "text",
 				content: "foo"
 			},
 			{
-				type: "content",
+				type: "text",
 				content: "bar\n"
 			},
 			{
@@ -227,11 +230,11 @@ function test() {
 					type: "region",
 					segments: [
 						{
-							type: "content",
+							type: "text",
 							content: "foo"
 						},
 						{
-							type: "content",
+							type: "text",
 							content: "bar\n"
 						}
 					]

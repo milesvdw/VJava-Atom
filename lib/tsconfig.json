@@ -2,7 +2,7 @@
 	"compileOnSave": true,
 	"compilerOptions": {
 		"alwaysStrict": true,
-		"strictNullChecks": true,
+		"strictNullChecks": false,
 		"allowSyntheticDefaultImports": true,
 		"module": "es6",
 		"target": "es6",
