@@ -31,7 +31,7 @@ declare global {
 }
 
 if (!Array.prototype.last) {
-  Array.prototype.last = function() {
+  Array.prototype.last = function () {
     return this[this.length - 1];
   }
 }
@@ -108,11 +108,11 @@ class VJava {
   selections: Selection[]
   ui: VJavaUI
   doc: RegionNode
-  raw: ""
+  raw: string
   colorpicker: {}
   dimensionColors: {}
   activeChoices: string[] // in the form of dimensionId:left|right
-  subscriptions: {}
+  subscriptions: CompositeDisposable
 
   // initialize the user interface
   // TODO: make this a function that returns an object conforming to VJavaUI
@@ -158,7 +158,7 @@ class VJava {
       $('#new-dimension-name').on('focusout', () => {
           dimName = $('#new-dimension-name').val();
           for(var i = 0; i < this.ui.dimensions.length; i ++) {
-              if(this.ui.dimensions[i].dimension === dimName) {
+              if(this.ui.dimensions[i].name === dimName) {
                   alert('Please select a unique name for this dimension');
                   setTimeout(() => {
                      $('#new-dimension-name').focus();
@@ -208,9 +208,9 @@ class VJava {
 
   //update the color of all matching dimensions in the document
   updateDimensionColor(dimension) {
-    this.ui.session[dimension.dimension] = dimension.color;
+    this.ui.session[dimension.name] = dimension.color;
     for(var i = 0; i < this.doc.segments.length; i ++) {
-      this.changeDimColor(dimension, this.doc[i]);
+      this.changeDimColor(dimension, this.doc.segments[i]);
     }
     this.updateColors();
   }
@@ -218,7 +218,7 @@ class VJava {
   //change this node's color if appropriate, and recurse if necessary
   changeDimColor(dimension, node) {
     if(node.type == 'choice') {
-      if(node.dimension == dimension.dimension) {
+      if(node.name == dimension.name) {
         node.color = dimension.colorpicker.spectrum('get').toHexString();
       }
 
@@ -231,16 +231,16 @@ class VJava {
     }
   }
 
-  getChoiceRange(choice) {
-    return [choice[0].span.start,choice.last().span.end];
+  getChoiceRange(node: RegionNode) {
+    return [node.segments[0].span.start,node.segments.last().span.end];
   }
 
-  getChoiceColumnRange(choice) {
-    if(choice.length < 1) return [0,-1]; //hack to prevent empty alternatives from bumping things around
-    return [choice[0].span.start[0],choice.last().span.end[0]];
+  getChoiceColumnRange(choice: RegionNode) {
+    if(choice.segments.length < 1) return [0,-1]; //hack to prevent empty alternatives from bumping things around
+    return [choice.segments[0].span.start[0],choice.segments.last().span.end[0]];
   }
 
-  renderContents(item) {
+  renderContents(item: SegmentNode) {
     var editor = atom.workspace.getActiveTextEditor();
     item.span.start[0] = item.span.start[0] - linesRemoved;
     var content;
@@ -249,7 +249,7 @@ class VJava {
       var found = false;
       var selection;
       for (var i = 0; i < this.selections.length; i ++) {
-        if (this.selections[i].name === item.dimension) {
+        if (this.selections[i].name === item.name) {
           found = true;
           selection = this.selections[i];
           break;
@@ -311,12 +311,12 @@ class VJava {
     this.clearColors();
     var colors = '';
     for(var i = 0; i < this.doc.segments.length; i ++) {
-        colors = colors + this.setColors(this.doc[i]);
+        colors = colors + this.setColors(this.doc.segments[i]);
     }
     $('head').append(`<style id='dimension-color-styles'>${colors}</style>`);
   }
 
-  setColors(node) {
+  setColors(node: SegmentNode) {
       //if this is a dimension
       var colors = '';
       if(node.type === 'choice') {
@@ -359,31 +359,31 @@ class VJava {
             //add the colors and borders as styles to the document head
 
             colors = colors +
-            `atom-text-editor::shadow ${selector}.${getLeftCssClass(dimension.dimension)} {
+            `atom-text-editor::shadow ${selector}.${getLeftCssClass(dimension.name)} {
               background: linear-gradient( 90deg, ${nestGradient}, ${leftcolor} ${x+increment}%);
             }
-            atom-text-editor::shadow  ${selector}.${getRightCssClass(dimension.dimension)} {
+            atom-text-editor::shadow  ${selector}.${getRightCssClass(dimension.name)} {
               background: linear-gradient( 90deg, ${nestGradient}, ${rightcolor} ${x+increment}%);
             }`
           } else {
             colors = colors +
-            `atom-text-editor::shadow .${getLeftCssClass(dimension.dimension)} {
+            `atom-text-editor::shadow .${getLeftCssClass(dimension.name)} {
               background-color: ${leftcolor};
             }
-            atom-text-editor::shadow .${getRightCssClass(dimension.dimension)} {
+            atom-text-editor::shadow .${getRightCssClass(dimension.name)} {
               background-color: ${rightcolor};
             }`
           }
 
           //recurse left and right
-          this.nesting.push({ selector: `${node.dimension}-left`, dimension: dimension});
+          this.nesting.push({ selector: `${node.name}-left`, dimension: dimension});
           //recurse on left and right
           for(var i = 0; i < node.left.segments.length; i ++) {
             colors = colors + this.setColors(node.left.segments[i]);
           }
           this.nesting.pop();
 
-          this.nesting.push({ selector: `${node.dimension}-right`, dimension: dimension});
+          this.nesting.push({ selector: `${node.name}-right`, dimension: dimension});
           for(var i = 0; i < node.right.segments.length; i ++) {
             colors = colors + this.setColors(node.right.segments[i]);
           }
@@ -392,156 +392,156 @@ class VJava {
       return colors;
   }
 
-  toggleDimensionEdit(dimension, branch) {
+  toggleDimensionEdit(dimension: DimensionUI, branch: Branch) {
     var otherbranch;
     if(branch === 'left') otherbranch = 'right';
     else otherbranch = 'left';
-    if($(`#${dimension.dimension}-edit-${branch}`).hasClass('edit-enabled')) {
-      $(`#${dimension.dimension}-edit-${branch}`).removeClass('edit-enabled');
-      $(`#${dimension.dimension}-edit-${branch}`).addClass('edit-locked');
+    if($(`#${dimension.name}-edit-${branch}`).hasClass('edit-enabled')) {
+      $(`#${dimension.name}-edit-${branch}`).removeClass('edit-enabled');
+      $(`#${dimension.name}-edit-${branch}`).addClass('edit-locked');
 
-      var index = this.activeChoices.indexOf(`${dimension.dimension}:${branch}`);
+      var index = this.activeChoices.indexOf(`${dimension.name}:${branch}`);
       this.activeChoices.splice(index,1);
 
     } else {
-      $(`#${dimension.dimension}-edit-${branch}`).addClass('edit-enabled');
-      $(`#${dimension.dimension}-edit-${branch}`).removeClass('edit-locked');
+      $(`#${dimension.name}-edit-${branch}`).addClass('edit-enabled');
+      $(`#${dimension.name}-edit-${branch}`).removeClass('edit-locked');
 
 
-      var index = this.activeChoices.indexOf(`${dimension.dimension}:${branch}`);
-      if (index < 0) this.activeChoices.push(`${dimension.dimension}:${branch}`);
+      var index = this.activeChoices.indexOf(`${dimension.name}:${branch}`);
+      if (index < 0) this.activeChoices.push(`${dimension.name}:${branch}`);
     }
-    if($(`#${dimension.dimension}-edit-${otherbranch}`).hasClass('edit-enabled')) {
-      $(`#${dimension.dimension}-edit-${otherbranch}`).removeClass('edit-enabled');
-      $(`#${dimension.dimension}-edit-${otherbranch}`).addClass('edit-locked');
+    if($(`#${dimension.name}-edit-${otherbranch}`).hasClass('edit-enabled')) {
+      $(`#${dimension.name}-edit-${otherbranch}`).removeClass('edit-enabled');
+      $(`#${dimension.name}-edit-${otherbranch}`).addClass('edit-locked');
 
-      var index = this.activeChoices.indexOf(`${dimension.dimension}:${otherbranch}`);
+      var index = this.activeChoices.indexOf(`${dimension.name}:${otherbranch}`);
       this.activeChoices.splice(index,1);
     }
   }
 
-  addViewListeners(dimension) {
-    $(`#${dimension.dimension}-disable-right`).on('click', () => {
+  addViewListeners(dimension: DimensionUI) {
+    $(`#${dimension.name}-disable-right`).on('click', () => {
       //switch the right branch to view mode
-      $(`#${dimension.dimension}-view-right`).show();
-      $(`#${dimension.dimension}-disable-right`).hide();
+      $(`#${dimension.name}-view-right`).show();
+      $(`#${dimension.name}-disable-right`).hide();
 
       //make appropriate changes to the document
-      this.selectRight(dimension.dimension);
+      this.selectRight(dimension.name);
     });
 
-    $(`#${dimension.dimension}-view-right`).on('click', () => {
+    $(`#${dimension.name}-view-right`).on('click', () => {
         //put the right alternative in edit mode
-        $(`#${dimension.dimension}-view-right`).hide();
-        $(`#${dimension.dimension}-edit-right`).show();
+        $(`#${dimension.name}-view-right`).hide();
+        $(`#${dimension.name}-edit-right`).show();
         this.toggleDimensionEdit(dimension, 'right');
 
         //ensure that the left alternative isn't in edit mode
-        if($(`#${dimension.dimension}-edit-left`).is(":visible")) {
-          $(`#${dimension.dimension}-view-left`).show();
-          $(`#${dimension.dimension}-edit-left`).hide();
+        if($(`#${dimension.name}-edit-left`).is(":visible")) {
+          $(`#${dimension.name}-view-left`).show();
+          $(`#${dimension.name}-edit-left`).hide();
 
           //remove the left selection since one has been made
-          var index = this.activeChoices.indexOf(`${dimension.dimension}:left`);
+          var index = this.activeChoices.indexOf(`${dimension.name}:left`);
           this.activeChoices.splice(index,1);
 
         }
 
-        this.activeChoices.push(`${dimension.dimension}:right`)
+        this.activeChoices.push(`${dimension.name}:right`)
     });
 
-    $(`#${dimension.dimension}-edit-right`).on('click', () => {
+    $(`#${dimension.name}-edit-right`).on('click', () => {
       //go back to viewing
-      $(`#${dimension.dimension}-view-right`).show();
-      $(`#${dimension.dimension}-edit-right`).hide();
+      $(`#${dimension.name}-view-right`).show();
+      $(`#${dimension.name}-edit-right`).hide();
 
       //remove the right selection since one has been made
-      var index = this.activeChoices.indexOf(`${dimension.dimension}:right`);
+      var index = this.activeChoices.indexOf(`${dimension.name}:right`);
       this.activeChoices.splice(index,1);
     });
 
-    $(`#${dimension.dimension}-view-right`).on('contextmenu', () => {
+    $(`#${dimension.name}-view-right`).on('contextmenu', () => {
       //as long as the left alternative isn't also hidden, hide this one
-      if(!$(`#${dimension.dimension}-disable-left`).is(":visible")) {
+      if(!$(`#${dimension.name}-disable-left`).is(":visible")) {
         //put the right alternative in edit mode
-        $(`#${dimension.dimension}-view-right`).hide();
-        $(`#${dimension.dimension}-disable-right`).show();
-        this.unselectRight(dimension.dimension);
+        $(`#${dimension.name}-view-right`).hide();
+        $(`#${dimension.name}-disable-right`).show();
+        this.unselectRight(dimension.name);
       }
       return false;
     });
 
 
-    $(`#${dimension.dimension}-disable-left`).on('click', () => {
+    $(`#${dimension.name}-disable-left`).on('click', () => {
       //switch the right branch to view mode
-      $(`#${dimension.dimension}-view-left`).show();
-      $(`#${dimension.dimension}-disable-left`).hide();
+      $(`#${dimension.name}-view-left`).show();
+      $(`#${dimension.name}-disable-left`).hide();
 
       //make appropriate changes to the document
-      this.selectLeft(dimension.dimension);
+      this.selectLeft(dimension.name);
     });
 
-    $(`#${dimension.dimension}-view-left`).on('click', () => {
+    $(`#${dimension.name}-view-left`).on('click', () => {
         //put the right alternative in edit mode
-        $(`#${dimension.dimension}-view-left`).hide();
-        $(`#${dimension.dimension}-edit-left`).show();
+        $(`#${dimension.name}-view-left`).hide();
+        $(`#${dimension.name}-edit-left`).show();
 
         //ensure that the right alternative isn't in edit mode
-        if($(`#${dimension.dimension}-edit-right`).is(":visible")) {
-          $(`#${dimension.dimension}-view-right`).show();
-          $(`#${dimension.dimension}-edit-right`).hide();
+        if($(`#${dimension.name}-edit-right`).is(":visible")) {
+          $(`#${dimension.name}-view-right`).show();
+          $(`#${dimension.name}-edit-right`).hide();
 
           //remove the left selection since one has been made
-          var index = this.activeChoices.indexOf(`${dimension.dimension}:right`);
+          var index = this.activeChoices.indexOf(`${dimension.name}:right`);
           this.activeChoices.splice(index,1);
 
         }
-        this.activeChoices.push(`${dimension.dimension}:left`);
+        this.activeChoices.push(`${dimension.name}:left`);
     });
 
-    $(`#${dimension.dimension}-edit-left`).on('click', () => {
+    $(`#${dimension.name}-edit-left`).on('click', () => {
       //go back to viewing
-      $(`#${dimension.dimension}-view-left`).show();
-      $(`#${dimension.dimension}-edit-left`).hide();
+      $(`#${dimension.name}-view-left`).show();
+      $(`#${dimension.name}-edit-left`).hide();
 
       //remove the right selection since one has been made
-      var index = this.activeChoices.indexOf(`${dimension.dimension}:right`);
+      var index = this.activeChoices.indexOf(`${dimension.name}:right`);
       this.activeChoices.splice(index,1);
     });
 
-    $(`#${dimension.dimension}-view-left`).on('contextmenu', () => {
+    $(`#${dimension.name}-view-left`).on('contextmenu', () => {
         //as long as the right alternative isn't also hidden, hide this one
-        if(!$(`#${dimension.dimension}-disable-right`).is(":visible")) {
+        if(!$(`#${dimension.name}-disable-right`).is(":visible")) {
           //put the left alternative in edit mode
-          $(`#${dimension.dimension}-view-left`).hide();
-          $(`#${dimension.dimension}-disable-left`).show();
-          this.unselectLeft(dimension.dimension);
+          $(`#${dimension.name}-view-left`).hide();
+          $(`#${dimension.name}-disable-left`).show();
+          this.unselectLeft(dimension.name);
         }
         return false;
     });
   }
 
-  docToPlainText(node, editor) {
+  docToPlainText(editor: AtomCore.IEditor) {
       var finalContents = [];
       for(var i = 0; i < this.doc.segments.length; i ++) {
-        finalContents.push(this.nodeToPlainText(this.doc[i], editor, false));
+        finalContents.push(this.nodeToPlainText(this.doc.segments[i], editor, false));
       }
       return finalContents.join('');
   }
 
-  nodeToPlainText(node, editor, useOldContent) {
+  nodeToPlainText(node: SegmentNode, editor: AtomCore.IEditor, useOldContent: boolean) {
     if(node.type === 'choice') {
       var found = false;
       var selection;
       for (var i = 0; i < this.selections.length; i ++) {
-        if (this.selections[i].name === node.dimension) {
+        if (this.selections[i].name === node.name) {
           found = true;
           selection = this.selections[i];
           break;
         }
       }
 
-      var contents = `\n#ifdef ${node.dimension}`;
+      var contents = `\n#ifdef ${node.name}`;
       useOldContent = found && !selection['left'];
 
       for(var j = 0; j < node.left.segments.length; j ++) {
@@ -575,14 +575,14 @@ class VJava {
 
   //using the list of dimensions contained within the ui object,
   //add html elements, markers, and styles to distinguish dimensions for the user
-  renderDimensionUI(editor, node) {
+  renderDimensionUI(editor: AtomCore.IEditor, node: SegmentNode) {
 
     //if this is a dimension
-    if(node.type === 'choice') {
+    if(node.type === "choice") {
         var found = false;
         var selection;
         for (var i = 0; i < this.selections.length; i ++) {
-          if (this.selections[i].name === node.dimension) {
+          if (this.selections[i].name === node.name) {
             found = true;
             selection = this.selections[i];
             break;
@@ -594,70 +594,75 @@ class VJava {
           //if that exists, we're good
         }
         //next try the session color set
-        else if(this.ui.session[node.dimension]) {
-          node.color = this.ui.session[node.dimension];
+        else if(this.ui.session[node.name]) {
+          node.color = this.ui.session[node.name];
         }
         //lastly default to something ugly
         else {
           node.color = '#7a2525';
-          this.ui.session[node.dimension] = node.color;
+          this.ui.session[node.name] = node.color;
         }
 
         //and this dimension has not yet been parsed
-        if(this.ui.dimensions.indexOf(node.dimension) < 0) {
+        if(this.ui.hasDimension(node.name)) {
 
             //initialize this dimension for future selection
-            this.selections.push({ name: node.dimension, left: true, right: true});
+            this.selections.push({ name: node.name, left: true, right: true});
 
-
-            //add this to the list of parsed dimensions, and generate a UI element for it
-            this.ui.dimensions.push(node.dimension);
-
-            var dimDiv = $(`<div class='form-group dimension-ui-div' id='${node.dimension}'>
-              <a href='' id='removeDimension-${node.dimension}' class='delete_icon'><img name='removeDimensionImg' border="0" src="${iconsPath}/delete-bin.png" width="16" height="18"/> </a>
-              <input type='text' id="${node.dimension}-colorpicker">
-              <h2>${node.dimension}</h2>
+            var dimDiv = $(`<div class='form-group dimension-ui-div' id='${node.name}'>
+              <a href='' id='removeDimension-${node.name}' class='delete_icon'><img name='removeDimensionImg' border="0" src="${iconsPath}/delete-bin.png" width="16" height="18"/> </a>
+              <input type='text' id="${node.name}-colorpicker">
+              <h2>${node.name}</h2>
               <br>
               <span class='toggle-left'>
-              <span class='edit' id='${node.dimension}-disable-left' style='display: none;'>&nbsp;&nbsp;&nbsp;</span>
-              <span class='edit edit-enabled' id='${node.dimension}-edit-left' style='display: none;'>&#9998;</span>
-              <span class='view view-enabled' id='${node.dimension}-view-left'>&#128065;</span>
+              <span class='edit' id='${node.name}-disable-left' style='display: none;'>&nbsp;&nbsp;&nbsp;</span>
+              <span class='edit edit-enabled' id='${node.name}-edit-left' style='display: none;'>&#9998;</span>
+              <span class='view view-enabled' id='${node.name}-view-left'>&#128065;</span>
               </span>
-              <span class='choice-label' id='${node.dimension}-left-text'>Left</span><br>
+              <span class='choice-label' id='${node.name}-left-text'>Left</span><br>
               <span class='toggle-right'>
-              <span class='edit' id='${node.dimension}-disable-right' style='display: none;'>&nbsp;&nbsp;&nbsp;</span>
-              <span class='edit edit-enabled' id='${node.dimension}-edit-right' style='display: none;'>&#9998;</span>
-              <span class='view view-enabled' id='${node.dimension}-view-right'>&#128065;</span>
+              <span class='edit' id='${node.name}-disable-right' style='display: none;'>&nbsp;&nbsp;&nbsp;</span>
+              <span class='edit edit-enabled' id='${node.name}-edit-right' style='display: none;'>&#9998;</span>
+              <span class='view view-enabled' id='${node.name}-view-right'>&#128065;</span>
               </span>
-              <span class='choice-label' id='${node.dimension}-right-text'>Right</span><br></div>  `);
+              <span class='choice-label' id='${node.name}-right-text'>Right</span><br></div>  `);
             this.ui.main.append(dimDiv);
 
-            //make choice selections if necessary
+            //only hook up listeners, etc. once!
+            document.getElementById('removeDimension-' + node.name).addEventListener("click", () => {
+              this.removeDimension(node.name);
+            });
 
+
+            var cp = $(`#${node.name}-colorpicker`).spectrum({
+              color: node.color
+            }).on('change', () => {
+              this.updateDimensionColor(node);
+            });
+
+            var dimUIElement: DimensionUI = {
+              name: node.name,
+              color: node.color,
+              colorpicker: cp
+            }
+
+            this.addViewListeners(dimUIElement);
+
+            //add this to the list of parsed dimensions, and generate a UI element for it
+            this.ui.dimensions.push(dimUIElement);
+
+            //make choice selections if necessary
             //see if a  choice has been made in this dimension
-            var index = this.activeChoices.indexOf(`${node.dimension}:left`);
-            if(index < 0) index = this.activeChoices.indexOf(`${node.dimension}:right`);
+            var index = this.activeChoices.indexOf(`${node.name}:left`);
+            if(index < 0) index = this.activeChoices.indexOf(`${node.name}:right`);
 
             //if so, toggle the ui appropriately
             if(index >= 0) { //this implies that a selection already exists for this element
 
               var choice = this.activeChoices[index];
               var branch = choice.split(':')[1];
-              this.toggleDimensionEdit(node, branch);
+              this.toggleDimensionEdit(dimUIElement, branch);
             }
-
-            //only hook up listeners, etc. once!
-            document.getElementById('removeDimension-' + node.dimension).addEventListener("click", () => {
-              this.removeDimension(node.dimension);
-            });
-
-            this.addViewListeners(node);
-
-            node.colorpicker = $(`#${node.dimension}-colorpicker`).spectrum({
-              color: node.color
-            }).on('change', () => {
-              this.updateDimensionColor(node);
-            });
         }
 
 
@@ -666,14 +671,14 @@ class VJava {
             var leftRange = editor.markBufferRange(this.getChoiceRange(node.left));
 
             //decorate with the appropriate css classes
-            editor.decorateMarker(leftRange, {type: 'line', class: getLeftCssClass(node.dimension)});
+            editor.decorateMarker(leftRange, {type: 'line', class: getLeftCssClass(node.name)});
 
             for(var i = this.nesting.length - 1; i >= 0; i --) {
               //nesting class format: 'nested-[DIM ID]-[BRANCH]-[LEVEL]'
               editor.decorateMarker(leftRange, {type: 'line', class: 'nested-' + this.nesting[i].selector + '-' + i});
             }
 
-            this.nesting.push({ selector: `${node.dimension}-left`, dimension: node});
+            this.nesting.push({ selector: `${node.name}-left`, dimension: node});
             //recurse on left and right
             for(var i = 0; i < node.left.segments.length; i ++) {
               this.renderDimensionUI(editor, node.left.segments[i]);
@@ -685,13 +690,13 @@ class VJava {
 
             var rightRange = editor.markBufferRange(this.getChoiceRange(node.right));
 
-            editor.decorateMarker(rightRange, {type: 'line', class: getRightCssClass(node.dimension)});
+            editor.decorateMarker(rightRange, {type: 'line', class: getRightCssClass(node.name)});
             for(var i = this.nesting.length - 1; i >= 0; i --) {
               //nesting class format: 'nested-[DIM ID]-[BRANCH]-[LEVEL]'
               editor.decorateMarker(rightRange, {type: 'line', class: 'nested-' + this.nesting[i].selector + '-' + i});
             }
 
-            this.nesting.push({ selector: `${node.dimension}-right`, dimension: node});
+            this.nesting.push({ selector: `${node.name}-right`, dimension: node});
             for(var i = 0; i < node.right.segments.length; i ++) {
               this.renderDimensionUI(editor, node.right.segments[i]);
             }
@@ -703,7 +708,7 @@ class VJava {
     }
   }
 
-  removeDimension(dimName) {
+  removeDimension(dimName: string) {
       var sure = confirm('Are you sure you want to remove this dimension? Any currently \
               visible code in this dimension will be promoted. Any hidden code will be removed.')
 
@@ -741,18 +746,18 @@ class VJava {
     for(var j = 0; j < this.doc.segments.length; j++) {
       var segment = this.doc.segments[j];
       if(segment.type === "choice") {
-        if(segment.dimension === dimName) {
+        if(segment.name === dimName) {
           this.doc.segments.splice(j, 1, ... this.promoteBranchForDimensionInNode(segment, editor, dimName, left, right));
         } else {
           for(var i = 0; i < segment.left.segments.length; i ++) {
             var lsegment = segment.left.segments[i];
-            if(lsegment.type === 'choice' && lsegment.dimension === dimName) {
+            if(lsegment.type === 'choice' && lsegment.name === dimName) {
               lsegment.left.segments.splice(i, 1, ... this.promoteBranchForDimensionInNode(lsegment, editor, dimName, left, right));
             }
           }
           for(var i = 0; i < segment.right.segments.length; i ++) {
             var rsegment = segment.right.segments[i];
-            if(rsegment.type === 'choice' && rsegment.dimension === dimName) {
+            if(rsegment.type === 'choice' && rsegment.name === dimName) {
               segment.right.segments.splice(i, 1, ... this.promoteBranchForDimensionInNode(rsegment, editor, dimName, left, right));
             }
           }
@@ -763,9 +768,9 @@ class VJava {
 
   //left and right represent whether the left and right branches should be promoted
   //a value of 'true' indicates that the content in that branch should be promoted
-  promoteBranchForDimensionInNode(node: ChoiceNode, editor, dimName, left, right) : SegmentNode[] {
+  promoteBranchForDimensionInNode(node: ChoiceNode, editor: AtomCore.IEditor, dimName: string, left: boolean, right: boolean) : SegmentNode[] {
     //if this is the dimension being promoted, then do that
-    if(node.dimension === dimName) {
+    if(node.name === dimName) {
       //TODO: is this a memory leak? removing references to these objects but perhaps never deleting them
       var region = [];
       if(left) region = region.concat(node.left);
@@ -779,20 +784,20 @@ class VJava {
     else {
       for(var i = 0; i < node.left.segments.length; i ++) {
         var lsegment = node.left.segments[i];
-        if(lsegment.type === 'choice' && lsegment.dimension === dimName) {
+        if(lsegment.type === 'choice' && lsegment.name === dimName) {
           node.left.segments.splice(i, 1, ... this.promoteBranchForDimensionInNode(lsegment, editor, dimName, left, right));
         }
       }
       for(var i = 0; i < node.right.segments.length; i ++) {
         var rsegment = node.right.segments[i];
-        if(rsegment.type === 'choice' && rsegment.dimension === dimName) {
+        if(rsegment.type === 'choice' && rsegment.name === dimName) {
           node.right.segments.splice(i, 1, ... this.promoteBranchForDimensionInNode(rsegment, editor, dimName, left, right));
         }
       }
     }
   }
 
-  deleteBranch(region: RegionNode, editor) {
+  deleteBranch(region: RegionNode, editor: AtomCore.IEditor) {
     for(let segment of region.segments) {
       if(segment.type === 'choice') {
         this.deleteBranch(segment.left, editor);
@@ -803,19 +808,19 @@ class VJava {
     }
   }
 
-  preserveChanges(editor) {
+  preserveChanges(editor: AtomCore.IEditor) {
     for(var i = 0; i < this.doc.segments.length; i++) {
-      this.preserveChangesonNode(editor, this.doc[i]);
+      this.preserveChangesonNode(editor, this.doc.segments[i]);
     }
   }
 
-  preserveChangesonNode(editor, node: SegmentNode) {
+  preserveChangesonNode(editor: AtomCore.IEditor, node: SegmentNode) {
     if(node.type === 'choice') {
       //found is used to see if any selections have been made - if this is a brand new dimension, default both branches to shown
       var found = false;
       var selection;
       for (var i = 0; i < this.selections.length; i ++) {
-        if (this.selections[i].name === node.dimension) {
+        if (this.selections[i].name === node.name) {
           found = true;
           selection = this.selections[i];
           break;
@@ -839,28 +844,28 @@ class VJava {
     }
   }
 
-  renderDocument(editor) {
+  renderDocument(editor: AtomCore.IEditor) {
     linesRemoved = 0;
     var contents = [];
     for(var i = 0; i < this.doc.segments.length; i ++) {
-      contents.push(this.renderContents(this.doc[i]));
+      contents.push(this.renderContents(this.doc.segments[i]));
     }
     var contentString = contents.join('');
 
     editor.setText(contentString);
   }
 
-  adjustForReShow(editor, dimension, branch) {
+  adjustForReShow(editor: AtomCore.IEditor, dimension: string, branch: Branch) {
     linesReAdded = 0;
     for(var i = 0; i < this.doc.segments.length; i ++) {
-      this.adjustNode(this.doc[i], editor, dimension, branch);
+      this.adjustNode(this.doc.segments[i], editor, dimension, branch);
     }
   }
 
-  adjustNode(node, editor, dimension, branch) {
+  adjustNode(node: SegmentNode, editor: AtomCore.IEditor, dimension: string, branch: Branch) {
     node.span.start[0] = node.span.start[0] + linesReAdded;
     if(node.type === 'choice') {
-      if(node.dimension === dimension && branch === 'left') {
+      if(node.name === dimension && branch === 'left') {
         var choiceRange = this.getChoiceColumnRange(node.left);
         var size = choiceRange[1]-choiceRange[0];
         linesReAdded = linesReAdded + size + 1;
@@ -870,7 +875,7 @@ class VJava {
         }
       }
 
-      if(node.dimension === dimension && branch === 'right') {
+      if(node.name === dimension && branch === 'right') {
         var choiceRange = this.getChoiceColumnRange(node.right);
         var size = choiceRange[1]-choiceRange[0];
         linesReAdded = linesReAdded + size + 1;
@@ -884,7 +889,7 @@ class VJava {
   }
 
   //query the back-end parser, and call parseDimension where necessary
-  parseVJava(textContents, next) {
+  parseVJava(textContents: string, next: Function) {
     //send file contents to the backend, receive jsonified output
     var packagePath = atom.packages.resolvePackagePath("variational-java") + "/lib";
     exec('cd ' + packagePath);
@@ -893,12 +898,11 @@ class VJava {
     var parser = spawn('variational-parser',[],{ cwd: packagePath });
 
     parser.stdout.setEncoding('utf8');
-    parser.stdout.on('data', function (data) {
-      this.originalDoc = JSON.parse(data.toString());
+    parser.stdout.on('data', (data) => {
       this.doc = JSON.parse(data.toString());
       next();
     });
-    parser.on('exit', function (code) {
+    parser.on('exit', (code) => {
       console.log('child process exited with code ' + code);
     });
 
@@ -912,7 +916,7 @@ class VJava {
   // then a pull with the new selections
   // display both alternatives
   // show the right alternative
-  selectRight(dimName) {
+  selectRight(dimName: string) {
     var editor = atom.workspace.getActiveTextEditor();
     this.preserveChanges(editor);
     for (var i = 0; i < this.selections.length; i ++) {
@@ -923,12 +927,12 @@ class VJava {
     this.adjustForReShow(editor, dimName, 'right');
     this.renderDocument(editor);
     for(var i = 0; i < this.doc.segments.length; i ++) {
-      this.renderDimensionUI(editor, this.doc[i]);
+      this.renderDimensionUI(editor, this.doc.segments[i]);
     }
   }
 
   // hide the right alternative
-  unselectRight(dimName) {
+  unselectRight(dimName: string) {
     var editor = atom.workspace.getActiveTextEditor();
     this.preserveChanges(editor);
     for (var i = 0; i < this.selections.length; i ++) {
@@ -938,12 +942,12 @@ class VJava {
     }
     this.renderDocument(editor);
     for(var i = 0; i < this.doc.segments.length; i ++) {
-      this.renderDimensionUI(editor, this.doc[i]);
+      this.renderDimensionUI(editor, this.doc.segments[i]);
     }
   }
 
   // show the left alternative
-  selectLeft(dimName) {
+  selectLeft(dimName: string) {
     var editor = atom.workspace.getActiveTextEditor();
     this.preserveChanges(editor);
     for (var i = 0; i < this.selections.length; i ++) {
@@ -954,12 +958,12 @@ class VJava {
     this.adjustForReShow(editor, dimName, 'left');
     this.renderDocument(editor);
     for(var i = 0; i < this.doc.segments.length; i ++) {
-      this.renderDimensionUI(editor, this.doc[i]);
+      this.renderDimensionUI(editor, this.doc.segments[i]);
     }
   }
 
   // hide the left alternative
-  unselectLeft(dimName) {
+  unselectLeft(dimName: string) {
     var editor = atom.workspace.getActiveTextEditor();
     this.preserveChanges(editor);
     for (var i = 0; i < this.selections.length; i ++) {
@@ -970,7 +974,7 @@ class VJava {
 
     this.renderDocument(editor);
     for(var i = 0; i < this.doc.segments.length; i ++) {
-      this.renderDimensionUI(editor, this.doc[i]);
+      this.renderDimensionUI(editor, this.doc.segments[i]);
     }
   }
 
@@ -986,7 +990,7 @@ class VJava {
     var contents = activeEditor.getText();
 
     //parse the file
-    this.parseVJava(contents, function() {
+    this.parseVJava(contents, () => {
       // Events subscribed to in atom's system can be easily cleaned up with a CompositeDisposable
       this.subscriptions = new CompositeDisposable();
 
@@ -997,11 +1001,11 @@ class VJava {
       this.renderDocument(activeEditor);
 
       for(var i = 0; i < this.doc.segments.length; i ++) {
-        this.renderDimensionUI(activeEditor, this.doc[i]);
+        this.renderDimensionUI(activeEditor, this.doc.segments[i]);
       }
 
 
-      this.updateColors(activeEditor);
+      this.updateColors();
 
       // Register command that toggles vjava view
       this.subscriptions.add(atom.commands.add('atom-workspace', {
@@ -1064,7 +1068,7 @@ class VJava {
           start: [newRange.start.row, newRange.start.column],
           end: [newRange.end.row+1, newRange.end.column]
         },
-        dimension: dim,
+        name: dim,
         color: this.ui.session[dim],
         type: 'choice',
         left: {segments: [], type: "region"},
@@ -1089,17 +1093,17 @@ class VJava {
       this.renderDocument(activeEditor);
 
       for(var i = 0; i < this.doc.segments.length; i ++) {
-        this.renderDimensionUI(activeEditor, this.doc[i]);
+        this.renderDimensionUI(activeEditor, this.doc.segments[i]);
       }
 
       this.updateColors();
   }
 
-  insertVNode(node) {
+  insertVNode(node: ChoiceNode) {
       linesReAdded = 0;
 
       for(var i = 0; i < this.doc.segments.length; i++) {
-        var ret = this.insertVNodeAt(this.doc[i], node);
+        var ret = this.insertVNodeAt(this.doc.segments[i], node);
         //found it, do the insertion
         if(ret) {
           this.doc.segments.splice(i, 1, ret.first, ret.second, ret.third);
@@ -1196,14 +1200,14 @@ class VJava {
       this.ui.dimensions = [];
 
       //TODO: undo selections one at a time, then re-render. Important!
-      activeEditor.setText(this.docToPlainText(this.doc, activeEditor));
+      activeEditor.setText(this.docToPlainText(activeEditor));
     } else {
       rendering = true;
 
       var contents = activeEditor.getText();
 
       //parse the file
-      this.parseVJava(contents, function() {
+      this.parseVJava(contents, () => {
 
 
         this.ui.dimensions = [];
@@ -1213,11 +1217,11 @@ class VJava {
         this.renderDocument(activeEditor);
 
         for(var i = 0; i < this.doc.segments.length; i ++) {
-          this.renderDimensionUI(activeEditor, this.doc[i]);
+          this.renderDimensionUI(activeEditor, this.doc.segments[i]);
         }
 
 
-        this.updateColors(activeEditor);
+        this.updateColors();
 
         //preserve the contents for later comparison (put, get)
         this.raw = contents;

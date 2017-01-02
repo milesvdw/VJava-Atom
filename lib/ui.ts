@@ -7,9 +7,16 @@ export class VJavaUI {
 	secondary: JQuery;
 	message: JQuery;
 	dimensions: DimensionUI[]
+
+	hasDimension(name: string): boolean {
+		for(let dim of this.dimensions) {
+			if(dim.name === name) return true;
+		}
+		return false;
+	}
 }
 
-export interface DimensionUI {
+export class DimensionUI {
 	name: string;
 	color: string;
 	colorpicker?: JQuery;

@@ -16,7 +16,7 @@ interface ContentNode {
 // to reconstruct concrete syntax without leaking assumptions all over the place
 interface ChoiceNode {
 	type: "choice";
-	dimension: string;
+	name: string;
 	color?: string;
 	left: RegionNode;
 	right: RegionNode;
