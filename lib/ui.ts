@@ -1,3 +1,5 @@
+'use babel';
+
 export class VJavaUI {
 	panel: AtomCore.Panel;
 	main: JQuery;
