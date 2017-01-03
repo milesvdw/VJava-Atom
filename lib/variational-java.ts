@@ -11,7 +11,7 @@ import $ from 'jquery';
 import 'spectrum-colorpicker';
 import { CompositeDisposable } from 'atom';
 import { exec } from 'child_process';
-import { VJavaUI, DimensionUI } from './ui'
+import { VJavaUI, DimensionUI, Branch, Selector, Selection, NestLevel } from './ui'
 
 // ----------------------------------------------------------------------------
 
@@ -27,6 +27,10 @@ declare global {
     interface Panel {
       destroy();
     }
+  }
+
+  interface JQuery {
+    spectrum({color});
   }
 }
 
@@ -89,19 +93,6 @@ const secondaryDivId = 'variationalJavaUIButtons';
 
 var iconsPath = atom.packages.resolvePackagePath("variational-java") + "/icons";
 
-class NestLevel {
-  selector: string
-  dimension: ChoiceNode
-}
-
-class Selection {
-  name: string
-  left: boolean
-  right: boolean
-}
-
-type Branch = "left" | "right"
-
 class VJava {
 
   nesting: NestLevel[] // a stack represented nested dimensions
@@ -111,7 +102,7 @@ class VJava {
   raw: string
   colorpicker: {}
   dimensionColors: {}
-  activeChoices: string[] // in the form of dimensionId:left|right
+  activeChoices: Selector[] // in the form of dimensionId:left|right
   subscriptions: CompositeDisposable
 
   // initialize the user interface
@@ -330,8 +321,8 @@ class VJava {
           if(this.nesting.length > 0) {
             for(var j = 0; j < this.nesting.length; j ++) {
               //nesting class format: 'nested-[DIM ID]-[BRANCH]-[LEVEL]'
-              selectors.push('.nested-' + this.nesting[j].selector + '-' + j);
-              var branch: Branch = this.nesting[j].selector.split('-')[1];
+              selectors.push('.nested-' + this.nesting[j].selector.name + '-' + this.nesting[j].selector.branch + '-' + j);
+              var branch: Branch = this.nesting[j].selector.branch;
 
               //pre-shading nest color
               var nestcolor = this.nesting[j].dimension.color;
@@ -373,14 +364,16 @@ class VJava {
           }
 
           //recurse left and right
-          this.nesting.push({ selector: `${node.name}-left`, dimension: dimension});
+          var lselector: Selector = {name: node.name, branch: "left"};
+          this.nesting.push({ selector: lselector, dimension: dimension});
           //recurse on left and right
           for(var i = 0; i < node.left.segments.length; i ++) {
             colors = colors + this.setColors(node.left.segments[i]);
           }
           this.nesting.pop();
 
-          this.nesting.push({ selector: `${node.name}-right`, dimension: dimension});
+          var rselector: Selector = {name: node.name, branch: "left"}
+          this.nesting.push({ selector: rselector, dimension: dimension});
           for(var i = 0; i < node.right.segments.length; i ++) {
             colors = colors + this.setColors(node.right.segments[i]);
           }
@@ -393,27 +386,25 @@ class VJava {
     var otherbranch;
     if(branch === 'left') otherbranch = 'right';
     else otherbranch = 'left';
+
+    //toggle off
     if($(`#${dimension.name}-edit-${branch}`).hasClass('edit-enabled')) {
       $(`#${dimension.name}-edit-${branch}`).removeClass('edit-enabled');
       $(`#${dimension.name}-edit-${branch}`).addClass('edit-locked');
-
-      var index = this.activeChoices.indexOf(`${dimension.name}:${branch}`);
-      this.activeChoices.splice(index,1);
-
+      this.ui.removeActiveChoice(dimension.name, branch);
     } else {
+      //toggle on
       $(`#${dimension.name}-edit-${branch}`).addClass('edit-enabled');
       $(`#${dimension.name}-edit-${branch}`).removeClass('edit-locked');
 
 
-      var index = this.activeChoices.indexOf(`${dimension.name}:${branch}`);
-      if (index < 0) this.activeChoices.push(`${dimension.name}:${branch}`);
+      this.ui.updateActiveChoices(dimension.name, branch);
     }
     if($(`#${dimension.name}-edit-${otherbranch}`).hasClass('edit-enabled')) {
       $(`#${dimension.name}-edit-${otherbranch}`).removeClass('edit-enabled');
       $(`#${dimension.name}-edit-${otherbranch}`).addClass('edit-locked');
 
-      var index = this.activeChoices.indexOf(`${dimension.name}:${otherbranch}`);
-      this.activeChoices.splice(index,1);
+      this.ui.removeActiveChoice(dimension.name, branch);
     }
   }
 
@@ -439,12 +430,11 @@ class VJava {
           $(`#${dimension.name}-edit-left`).hide();
 
           //remove the left selection since one has been made
-          var index = this.activeChoices.indexOf(`${dimension.name}:left`);
-          this.activeChoices.splice(index,1);
+          this.ui.removeActiveChoice(dimension.name, "left");
 
         }
 
-        this.activeChoices.push(`${dimension.name}:right`)
+        this.ui.updateActiveChoices(dimension.name, "right");
     });
 
     $(`#${dimension.name}-edit-right`).on('click', () => {
@@ -453,8 +443,7 @@ class VJava {
       $(`#${dimension.name}-edit-right`).hide();
 
       //remove the right selection since one has been made
-      var index = this.activeChoices.indexOf(`${dimension.name}:right`);
-      this.activeChoices.splice(index,1);
+      this.ui.removeActiveChoice(dimension.name, "right");
     });
 
     $(`#${dimension.name}-view-right`).on('contextmenu', () => {
@@ -489,11 +478,10 @@ class VJava {
           $(`#${dimension.name}-edit-right`).hide();
 
           //remove the left selection since one has been made
-          var index = this.activeChoices.indexOf(`${dimension.name}:right`);
-          this.activeChoices.splice(index,1);
+          this.ui.removeActiveChoice(dimension.name, "right");
 
         }
-        this.activeChoices.push(`${dimension.name}:left`);
+        this.ui.updateActiveChoices(dimension.name, "left")
     });
 
     $(`#${dimension.name}-edit-left`).on('click', () => {
@@ -502,8 +490,7 @@ class VJava {
       $(`#${dimension.name}-edit-left`).hide();
 
       //remove the right selection since one has been made
-      var index = this.activeChoices.indexOf(`${dimension.name}:right`);
-      this.activeChoices.splice(index,1);
+      this.ui.removeActiveChoice(dimension.name, "right");
     });
 
     $(`#${dimension.name}-view-left`).on('contextmenu', () => {
@@ -653,15 +640,11 @@ class VJava {
 
             //make choice selections if necessary
             //see if a  choice has been made in this dimension
-            var index = this.activeChoices.indexOf(`${node.name}:left`);
-            if(index < 0) index = this.activeChoices.indexOf(`${node.name}:right`);
+            var choice = this.ui.getChoice(node.name);
 
-            //if so, toggle the ui appropriately
-            if(index >= 0) { //this implies that a selection already exists for this element
-
-              var choice = this.activeChoices[index];
-              var branch = choice.split(':')[1];
-              this.toggleDimensionEdit(dimUIElement, branch);
+            //if so, togchoicee the ui appropriately
+            if(choice) { //this implies that a selection a
+              this.toggleDimensionEdit(dimUIElement, choice.branch);
             }
         }
 
@@ -675,10 +658,10 @@ class VJava {
 
             for(var i = this.nesting.length - 1; i >= 0; i --) {
               //nesting class format: 'nested-[DIM ID]-[BRANCH]-[LEVEL]'
-              editor.decorateMarker(leftRange, {type: 'line', class: 'nested-' + this.nesting[i].selector + '-' + i});
+              editor.decorateMarker(leftRange, {type: 'line', class: 'nested-' + this.nesting[i].selector.name + '-' + this.nesting[i].selector.branch + '-' + i});
             }
 
-            this.nesting.push({ selector: `${node.name}-left`, dimension: node});
+            this.nesting.push({ selector: {name: node.name, branch: "left"}, dimension: node});
             //recurse on left and right
             for(var i = 0; i < node.left.segments.length; i ++) {
               this.renderDimensionUI(editor, node.left.segments[i]);
@@ -693,10 +676,10 @@ class VJava {
             editor.decorateMarker(rightRange, {type: 'line', class: getRightCssClass(node.name)});
             for(var i = this.nesting.length - 1; i >= 0; i --) {
               //nesting class format: 'nested-[DIM ID]-[BRANCH]-[LEVEL]'
-              editor.decorateMarker(rightRange, {type: 'line', class: 'nested-' + this.nesting[i].selector + '-' + i});
+              editor.decorateMarker(rightRange, {type: 'line', class: 'nested-' + this.nesting[i].selector.name + '-' + this.nesting[i].selector.branch + '-' + i});
             }
 
-            this.nesting.push({ selector: `${node.name}-right`, dimension: node});
+            this.nesting.push({ selector: {name: node.name, branch: "right"}, dimension: node});
             for(var i = 0; i < node.right.segments.length; i ++) {
               this.renderDimensionUI(editor, node.right.segments[i]);
             }
@@ -983,7 +966,7 @@ class VJava {
     this.ui = new VJavaUI();
     this.ui.session = [];
     this.nesting = [];
-    this.activeChoices = [];
+    this.ui.activeChoices = [];
 
     this.selections = !$.isEmptyObject({}) ? state : [];
 
@@ -1045,7 +1028,7 @@ class VJava {
 
   addChoiceSegment() {
 
-    if(!this.activeChoices[0]) {
+    if(!this.ui.activeChoices[0]) {
         alert('please make a selection before inserting a choice segment');
         return;
     };
@@ -1061,9 +1044,9 @@ class VJava {
       var marker = activeEditor.markBufferRange(newRange);
       node.marker = marker;
 
-      var choice = this.activeChoices[0];
-      var branch: Branch = choice.split(':')[1];
-      var dim = choice.split(':')[0];
+      var choice = this.ui.activeChoices[0];
+      var branch: Branch = choice.branch;
+      var dim = choice.name;
 
       var node: ChoiceNode = {
         span: {

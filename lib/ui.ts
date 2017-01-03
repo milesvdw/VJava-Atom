@@ -1,5 +1,23 @@
 'use babel';
 
+export class NestLevel {
+  selector: Selector
+  dimension: ChoiceNode
+}
+
+export class Selector {
+  name: string
+  branch: Branch
+}
+
+export class Selection {
+  name: string
+  left: boolean
+  right: boolean
+}
+
+export type Branch = "left" | "right"
+
 export class VJavaUI {
 	panel: AtomCore.Panel;
 	main: JQuery;
@@ -7,6 +25,7 @@ export class VJavaUI {
 	secondary: JQuery;
 	message: JQuery;
 	dimensions: DimensionUI[]
+	activeChoices: Selector[]
 
 	hasDimension(name: string): boolean {
 		for(let dim of this.dimensions) {
@@ -31,6 +50,35 @@ export class VJavaUI {
 			}
 			this.session.push(dimension);
 		}
+	}
+
+	updateActiveChoices(dimName: string, branch: Branch): boolean {
+		for(let choice of this.activeChoices) {
+			if(choice.name === dimName) {
+				choice.branch = branch;
+				return;
+			}
+		}
+		//if we didn't find this choice, insert a new one
+		this.activeChoices.push({name: dimName, branch: branch});
+		return;
+	}
+
+	removeActiveChoice(dimName: string, branch: Branch) {
+		for(var i = 0; i < this.activeChoices.length; i ++) {
+			var choice = this.activeChoices[i];
+			if(choice.name === dimName && choice.branch === branch) {
+				this.activeChoices.splice(i,1);
+				return;
+			}
+		}
+	}
+
+	getChoice(dimName: string): Selector {
+		for(let choice of this.activeChoices) {
+			if(choice.name === dimName) return choice;
+		}
+		return null;
 	}
 }
 
