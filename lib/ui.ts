@@ -3,7 +3,7 @@
 export class VJavaUI {
 	panel: AtomCore.Panel;
 	main: JQuery;
-	session: {};
+	session: DimensionUI[];
 	secondary: JQuery;
 	message: JQuery;
 	dimensions: DimensionUI[]
@@ -13,6 +13,24 @@ export class VJavaUI {
 			if(dim.name === name) return true;
 		}
 		return false;
+	}
+
+	sessionColorFor(name: string): string {
+		for(let dim of this.session) {
+			if(dim.name === name) return dim.color;
+		}
+		return 'none';
+	}
+
+	updateSession(dimension: DimensionUI) {
+		for(var i = 0; i < this.session.length; i ++) {
+			var dim = this.session[i];
+			if(dim.name === dimension.name) {
+				this.session[i] = dimension
+				return;
+			}
+			this.session.push(dimension);
+		}
 	}
 }
 

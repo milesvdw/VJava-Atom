@@ -145,7 +145,7 @@ abstract class SyntaxRewriter {
 		const newRight = this.rewriteRegion(node.right);
 		const newNode: ChoiceNode = {
 			type: "choice",
-			dimension: node.dimension,
+			name: node.name,
 			left: newLeft,
 			right: newRight
 		};
@@ -225,7 +225,7 @@ function test() {
 			},
 			{
 				type: "choice",
-				dimension: "test",
+				name: "test",
 				left: {
 					type: "region",
 					segments: [

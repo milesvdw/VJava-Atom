@@ -117,9 +117,6 @@ class VJava {
   // initialize the user interface
   // TODO: make this a function that returns an object conforming to VJavaUI
   createUI() {
-
-    console.log("Here's jQuery:");
-    console.log($);
     var mainUIElement = $(`<div id='${enclosingDivId}'><div id='${mainDivId}'></div>
                            <div id='${secondaryDivId}' class='vjava-secondary'>
                              <a href='' id='addNewDimension'><img id='addNewDimensionImg' border="0" src="${iconsPath}/add_square_button.png" width="30" height="30"/> </a>
@@ -207,8 +204,8 @@ class VJava {
   }
 
   //update the color of all matching dimensions in the document
-  updateDimensionColor(dimension) {
-    this.ui.session[dimension.name] = dimension.color;
+  updateDimensionColor(dimension: DimensionUI) {
+    this.ui.updateSession(dimension);
     for(var i = 0; i < this.doc.segments.length; i ++) {
       this.changeDimColor(dimension, this.doc.segments[i]);
     }
@@ -580,7 +577,9 @@ class VJava {
     //if this is a dimension
     if(node.type === "choice") {
         var found = false;
-        var selection;
+        var selection: Selection;
+
+
         for (var i = 0; i < this.selections.length; i ++) {
           if (this.selections[i].name === node.name) {
             found = true;
@@ -589,22 +588,23 @@ class VJava {
           }
         }
 
+
+        //next try the session color set
+        var sessionColor: string = this.ui.sessionColorFor(node.name);
         //first try to use the color on the dimension
         if(node.color) {
           //if that exists, we're good
         }
-        //next try the session color set
-        else if(this.ui.session[node.name]) {
-          node.color = this.ui.session[node.name];
+        else if(sessionColor != 'none') {
+          node.color = sessionColor;
         }
         //lastly default to something ugly
         else {
           node.color = '#7a2525';
-          this.ui.session[node.name] = node.color;
         }
 
         //and this dimension has not yet been parsed
-        if(this.ui.hasDimension(node.name)) {
+        if(!this.ui.hasDimension(node.name)) {
 
             //initialize this dimension for future selection
             this.selections.push({ name: node.name, left: true, right: true});
@@ -634,17 +634,17 @@ class VJava {
             });
 
 
-            var cp = $(`#${node.name}-colorpicker`).spectrum({
-              color: node.color
-            }).on('change', () => {
-              this.updateDimensionColor(node);
-            });
 
             var dimUIElement: DimensionUI = {
               name: node.name,
               color: node.color,
-              colorpicker: cp
+              colorpicker: null
             }
+            dimUIElement.colorpicker = $(`#${node.name}-colorpicker`).spectrum({
+              color: node.color
+            }).on('change', () => {
+              this.updateDimensionColor(dimUIElement);
+            });
 
             this.addViewListeners(dimUIElement);
 
@@ -981,7 +981,9 @@ class VJava {
   activate(state) {
     // TODO: load session from a file somewhere?
     this.ui = new VJavaUI();
-    this.ui.session = {};
+    this.ui.session = [];
+    this.nesting = [];
+    this.activeChoices = [];
 
     this.selections = !$.isEmptyObject({}) ? state : [];
 
@@ -1069,7 +1071,7 @@ class VJava {
           end: [newRange.end.row+1, newRange.end.column]
         },
         name: dim,
-        color: this.ui.session[dim],
+        color: this.ui.sessionColorFor(dim),
         type: 'choice',
         left: {segments: [], type: "region"},
         right: {segments: [], type: "region"}
@@ -1112,7 +1114,7 @@ class VJava {
       }
   }
 
-  insertVNodeAt(here: SegmentNode, node: ChoiceNode) {
+  insertVNodeAt(here: SegmentNode, node: ChoiceNode) : {first: SegmentNode, second: SegmentNode, third: SegmentNode} {
       var activeEditor = atom.workspace.getActiveTextEditor();
 
       if(here.marker) here.span = rangeToSpan(here.marker.getBufferRange());
@@ -1124,37 +1126,37 @@ class VJava {
           if(here.span.start[0] <= node.span.start[0] && here.span.end[0]+1 >= node.span.end[0]) { //we must slice open this node
 
               //if we added a left alternative, we need 2 lines. if we added a right alternative, we require 3 lines
-              var added = (node.left.segments.length > 0) ? 3 : 4;
+              var added: number = (node.left.segments.length > 0) ? 3 : 4;
               linesReAdded = linesReAdded + added;
               var firstRange: Span = {
                 start: here.span.start,
                 end: node.span.start
               };
 
-              var firstContent = activeEditor.getTextInBufferRange(firstRange);
+              var firstContent: string = activeEditor.getTextInBufferRange(firstRange);
 
               //slice creates a copy so we can modify safely
               var thirdStart: number[] = node.span.end.slice(0, 2);
               thirdStart[0] = thirdStart[0] - 1;
-              var thirdContent = activeEditor.getTextInBufferRange([thirdStart,here.span.end]);
+              var thirdContent: string = activeEditor.getTextInBufferRange([thirdStart,here.span.end]);
 
               node.span.end[0] = node.span.end[0] + 1; //bump it down one to account for the extra newline inserted upon rendering document
 
-              var thirdRange = {
+              var thirdRange: Span = {
                 start: node.span.end,
                 end: here.span.end
               };
               //do this manually since it won't get hit by the tree recursion
               thirdRange.end[0] = thirdRange.end[0] + linesReAdded;
 
-              var first = {
+              var first: ContentNode = {
                 span: firstRange,
                 marker: activeEditor.markBufferRange(firstRange),
                 content: firstContent,
                 type: 'text'
               };
-              var second = node;
-              var third = {
+              var second: ChoiceNode = node;
+              var third: ContentNode = {
                 span: thirdRange,
                 marker: activeEditor.markBufferRange(thirdRange),
                 content: thirdContent,
