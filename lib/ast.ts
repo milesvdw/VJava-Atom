@@ -1,48 +1,55 @@
+'use babel'
+
+import {Selection} from './ui';
 
 type Pos = [number, number]; // row, column
-interface Span {
+
+export interface Span {
 	start: Pos;
 	end: Pos;
 }
 
-interface ContentNode {
+export interface ContentNode {
 	type: "text";
 	content: string;
 	span?: Span;
 	marker?: AtomCore.IDisplayBufferMarker;
 }
 
+type ChoiceKind = "positive" | "contrapositive";
+
 // TODO: consider putting more concrete syntax stuff in here so that it's easy
 // to reconstruct concrete syntax without leaking assumptions all over the place
-interface ChoiceNode {
+export interface ChoiceNode {
 	type: "choice";
 	name: string;
 	color?: string;
-	left: RegionNode;
-	right: RegionNode;
+	thenbranch: RegionNode;
+	elsebranch: RegionNode;
+	kind?: ChoiceKind;
 	span?: Span;
 	marker?: AtomCore.IDisplayBufferMarker;
 }
 
 // This is probably what the parser should return at the top level.
-interface RegionNode {
+export interface RegionNode {
 	type: "region";
 	segments: SegmentNode[];
 	span?: Span;
 }
 
-type SegmentNode = ContentNode | ChoiceNode;
+export type SegmentNode = ContentNode | ChoiceNode;
 
 /**
  * Override visit methods to visit nodes of that type on the tree.
  * Call the base method in your override to continue traversal through a node's children.
  */
-abstract class SyntaxWalker {
+export abstract class SyntaxWalker {
 	visitContent(node: ContentNode): void { }
 
 	visitChoice(node: ChoiceNode): void {
-		this.visitRegion(node.left);
-		this.visitRegion(node.right);
+		this.visitRegion(node.thenbranch);
+		this.visitRegion(node.elsebranch);
 	}
 
 	visitRegion(region: RegionNode): void {
@@ -62,8 +69,8 @@ abstract class SyntaxWalker {
 /**
  * Overwrites spans in-place in a document.
  */
-class SpanWalker extends SyntaxWalker {
-	currentPos: [number, number] = [1,1]; // atom positions start at [1,1], right?
+export class SpanWalker extends SyntaxWalker {
+	currentPos: [number, number] = [1,1]; // atom positions start at [1,1], elsebranch?
 
 	accumulate(pos: Pos, str: string): Pos {
 		const newlineMatches = str.match(/\n/g) || [];
@@ -96,12 +103,12 @@ class SpanWalker extends SyntaxWalker {
 
 		// assume that choice syntax consumes a line (yay assumptions!)
 		this.currentPos = this.accumulate(startPos, "\n"); // #ifdef
-		this.visitRegion(node.left);
+		this.visitRegion(node.thenbranch);
 
 		// assumption to test if the #else syntax exists
-		if (node.right.segments.length !== 0) {
+		if (node.elsebranch.segments.length !== 0) {
 			this.currentPos = this.accumulate(this.currentPos, "\n"); // #else
-			this.visitRegion(node.right);
+			this.visitRegion(node.elsebranch);
 		}
 		this.currentPos = this.accumulate(this.currentPos, "\n"); // #endif
 
@@ -126,6 +133,7 @@ class SpanWalker extends SyntaxWalker {
  * Override rewrite methods to replace nodes in a document.
  */
 abstract class SyntaxRewriter {
+	constructor() {}
 	/**
 	 * Don't override this.
 	 */
@@ -141,13 +149,13 @@ abstract class SyntaxRewriter {
 	}
 
 	rewriteChoice(node: ChoiceNode): SegmentNode[] {
-		const newLeft = this.rewriteRegion(node.left);
-		const newRight = this.rewriteRegion(node.right);
+		const newthenbranch = this.rewriteRegion(node.thenbranch);
+		const newelsebranch = this.rewriteRegion(node.elsebranch);
 		const newNode: ChoiceNode = {
 			type: "choice",
 			name: node.name,
-			left: newLeft,
-			right: newRight
+			thenbranch: newthenbranch,
+			elsebranch: newelsebranch
 		};
 		return [newNode];
 	}
@@ -173,6 +181,41 @@ abstract class SyntaxRewriter {
 		};
 
 		return region;
+	}
+}
+
+class ViewRewriter extends SyntaxRewriter {
+
+	constructor(public selections: Selection[]) {
+		super();
+	}
+
+	rewriteChoice(node: ChoiceNode): ChoiceNode[] {
+		//found is used to see if any selections have been made - if this is a brand new dimension, default both branches to shown
+		var found = false;
+		var selection;
+		for (var i = 0; i < this.selections.length; i ++) {
+			if (this.selections[i].name === node.name) {
+				found = true;
+				selection = this.selections[i];
+				break;
+			}
+		}
+
+		//see if this alternative should be displayed
+		if(!found || selection['thenbranch']) {
+			node.thenbranch = this.rewriteRegion(node.thenbranch);
+		} else {
+			node.thenbranch = {type: "region", segments: []};
+		}
+
+		//see if this alternative should be displayed
+		if(!found || selection['elsebranch']) {
+			node.elsebranch = this.rewriteRegion(node.thenbranch);
+		} else {
+			node.elsebranch = {type: "region", segments: []};
+		}
+		return [node];
 	}
 }
 
@@ -210,6 +253,42 @@ class SimplifierRewriter extends SyntaxRewriter {
 	}
 }
 
+export function renderDocument(region: RegionNode) : string {
+	return region.segments.reduce(renderContents, '');
+}
+
+function renderContents(acc: string, node: SegmentNode) : string {
+	if (node.type === 'choice') {
+		return acc + renderDocument(node.thenbranch) + renderDocument(node.elsebranch);
+	}
+	else {
+		return acc + node.content;
+	}
+}
+
+export function docToPlainText(region: RegionNode) : string {
+	return region.segments.reduce(nodeToPlainText, '');
+}
+
+function nodeToPlainText(acc: string, node: SegmentNode) : string {
+	if(node.type === 'choice') {
+		var syntax = ''
+		if(node.kind === 'positive') syntax = '#ifdef';
+		else syntax = '#ifndef'
+		syntax = syntax + ' ' + node.name;
+
+		acc = acc + syntax + docToPlainText(node.thenbranch);
+		if(node.elsebranch.segments.length > 0) {
+			acc = acc + '#else' + docToPlainText(node.elsebranch);
+		}
+		acc = acc + '#endif';
+		return acc;
+	}
+	else {
+		return acc + node.content
+	}
+}
+
 function test() {
 	const rew = new SimplifierRewriter();
 	const doc: RegionNode = {
@@ -226,7 +305,7 @@ function test() {
 			{
 				type: "choice",
 				name: "test",
-				left: {
+				thenbranch: {
 					type: "region",
 					segments: [
 						{
@@ -239,7 +318,7 @@ function test() {
 						}
 					]
 				},
-				right: {
+				elsebranch: {
 					type: "region",
 					segments: []
 				}

@@ -1,5 +1,5 @@
 'use babel';
-
+import { ChoiceNode } from './ast'
 export class NestLevel {
   selector: Selector
   dimension: ChoiceNode
@@ -12,11 +12,11 @@ export class Selector {
 
 export class Selection {
   name: string
-  left: boolean
-  right: boolean
+  thenbranch: boolean
+  elsebranch: boolean
 }
 
-export type Branch = "left" | "right"
+export type Branch = "thenbranch" | "elsebranch"
 
 export class VJavaUI {
 	panel: AtomCore.Panel;
