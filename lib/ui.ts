@@ -16,7 +16,7 @@ export class Selection {
   elsebranch: boolean
 }
 
-export type Branch = "thenbranch" | "elsebranch"
+export type Branch = "thenbranch" | "elsebranch";
 
 export class VJavaUI {
 	panel: AtomCore.Panel;
@@ -24,8 +24,8 @@ export class VJavaUI {
 	session: DimensionUI[];
 	secondary: JQuery;
 	message: JQuery;
-	dimensions: DimensionUI[]
-	activeChoices: Selector[]
+	dimensions: DimensionUI[];
+	activeChoices: Selector[];
 
 	hasDimension(name: string): boolean {
 		for(let dim of this.dimensions) {
@@ -48,8 +48,8 @@ export class VJavaUI {
 				this.session[i] = dimension
 				return;
 			}
-			this.session.push(dimension);
 		}
+		this.session.push(dimension);
 	}
 
 	updateActiveChoices(dimName: string, branch: Branch): boolean {

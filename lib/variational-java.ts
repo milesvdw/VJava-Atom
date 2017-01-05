@@ -11,7 +11,7 @@ import $ from 'jquery';
 import 'spectrum-colorpicker';
 import { CompositeDisposable } from 'atom';
 import { exec } from 'child_process';
-import { Span, RegionNode, SegmentNode, ChoiceNode, ContentNode, renderDocument, docToPlainText} from './ast';
+import { Span, RegionNode, SegmentNode, ChoiceNode, ContentNode, renderDocument, docToPlainText, ViewRewriter, SpanWalker} from './ast';
 import { VJavaUI, DimensionUI, Branch, Selector, Selection, NestLevel } from './ui'
 
 // ----------------------------------------------------------------------------
@@ -32,6 +32,7 @@ declare global {
 
   interface JQuery {
     spectrum({color});
+    spectrum(method : string);
   }
 }
 
@@ -187,6 +188,7 @@ class VJava {
           dimension.colorpicker = $(document.getElementById(dimension.name + '-colorpicker')).spectrum({
             color: dimension.color
           }).on('change', () => {
+            dimension.color = dimension.colorpicker.spectrum('get').toHexString();
             this.updateDimensionColor(dimension);
           });
 
@@ -208,7 +210,7 @@ class VJava {
   changeDimColor(dimension, node) {
     if(node.type == 'choice') {
       if(node.name == dimension.name) {
-        node.color = dimension.colorpicker.spectrum('get').toHexString();
+        node.color = dimension.color;
       }
 
       for(var i = 0; i < node.thenbranch.segments.length; i ++) {
@@ -250,8 +252,13 @@ class VJava {
           var color = dimension.color;
 
           //find the color for the thenbranch alternative
-          var thenbranchcolor = shadeColor(color, .1);
-          var elsebranchcolor = shadeColor(color, -.1);
+          if(node.kind === 'positive') {
+            var thenbranchcolor = shadeColor(color, .1);
+            var elsebranchcolor = shadeColor(color, -.1);
+          } else {
+            var thenbranchcolor = shadeColor(color, -.1);
+            var elsebranchcolor = shadeColor(color, .1);
+          }
 
           var selectors = [];
           var nestColors = [];
@@ -264,9 +271,10 @@ class VJava {
 
               //pre-shading nest color
               var nestcolor = this.nesting[j].dimension.color;
+              var kind = this.nesting[j].dimension.kind;
 
               //nest in the correct branch color
-              if(branch === 'thenbranch') nestcolor = shadeColor(nestcolor, .1);
+              if((branch === 'thenbranch' && kind === 'positive') || (branch === 'elsebranch' && kind === 'contrapositive')) nestcolor = shadeColor(nestcolor, .1);
               else nestcolor = shadeColor(nestcolor, -.1);
 
               nestColors.push(nestcolor);
@@ -310,7 +318,7 @@ class VJava {
           }
           this.nesting.pop();
 
-          var rselector: Selector = {name: node.name, branch: "thenbranch"}
+          var rselector: Selector = {name: node.name, branch: "elsebranch"}
           this.nesting.push({ selector: rselector, dimension: dimension});
           for(var i = 0; i < node.elsebranch.segments.length; i ++) {
             colors = colors + this.setColors(node.elsebranch.segments[i]);
@@ -495,6 +503,17 @@ class VJava {
     }
   }
 
+  updateSelections(selection: Selection) {
+    for(let sel of this.selections) {
+      if(sel.name === selection.name) {
+        sel.thenbranch = selection.thenbranch;
+        sel.elsebranch = selection.elsebranch;
+        return;
+      }
+    }
+    this.selections.push(selection);
+  }
+
   //using the list of dimensions contained within the ui object,
   //add html elements, markers, and styles to distinguish dimensions for the user
   renderDimensionUI(editor: AtomCore.IEditor, node: SegmentNode) {
@@ -532,7 +551,7 @@ class VJava {
         if(!this.ui.hasDimension(node.name)) {
 
             //initialize this dimension for future selection
-            this.selections.push({ name: node.name, thenbranch: true, elsebranch: true});
+            this.updateSelections({ name: node.name, thenbranch: true, elsebranch: true});
 
             var dimDiv = $(`<div class='form-group dimension-ui-div' id='${node.name}'>
               <a href='' id='removeDimension-${node.name}' class='delete_icon'><img name='removeDimensionImg' border="0" src="${iconsPath}/delete-bin.png" width="16" height="18"/> </a>
@@ -568,6 +587,7 @@ class VJava {
             dimUIElement.colorpicker = $(`#${node.name}-colorpicker`).spectrum({
               color: node.color
             }).on('change', () => {
+              dimUIElement.color = dimUIElement.colorpicker.spectrum('get').toHexString();
               this.updateDimensionColor(dimUIElement);
             });
 
@@ -858,7 +878,9 @@ class VJava {
 
   updateEditorText() {
     var editor = atom.workspace.getActiveTextEditor();
-    editor.setText(renderDocument(this.doc));
+    var showDoc = new ViewRewriter(this.selections).rewriteRegion(this.doc);
+    new SpanWalker().visitRegion(showDoc);
+    editor.setText(renderDocument(showDoc));
   }
 
   // show the thenbranch alternative
@@ -1112,11 +1134,10 @@ class VJava {
   toggle() {
     var activeEditor = atom.workspace.getActiveTextEditor();
     if(this.ui.panel.isVisible()) {
-      $("#colorpickerscript").remove();
+
       this.ui.panel.destroy();
       this.ui.dimensions = [];
 
-      //TODO: undo selections one at a time, then re-render. Important!
       activeEditor.setText(docToPlainText(this.doc));
     } else {
       rendering = true;

@@ -70,7 +70,7 @@ export abstract class SyntaxWalker {
  * Overwrites spans in-place in a document.
  */
 export class SpanWalker extends SyntaxWalker {
-	currentPos: [number, number] = [1,1]; // atom positions start at [1,1], elsebranch?
+	currentPos: [number, number] = [0,0]; // atom positions start at [1,1], elsebranch?
 
 	accumulate(pos: Pos, str: string): Pos {
 		const newlineMatches = str.match(/\n/g) || [];
@@ -184,13 +184,22 @@ abstract class SyntaxRewriter {
 	}
 }
 
-class ViewRewriter extends SyntaxRewriter {
+export class ViewRewriter extends SyntaxRewriter {
 
 	constructor(public selections: Selection[]) {
 		super();
 	}
 
 	rewriteChoice(node: ChoiceNode): ChoiceNode[] {
+		const newthenbranch = this.rewriteRegion(node.thenbranch);
+		const newelsebranch = this.rewriteRegion(node.elsebranch);
+		const newNode: ChoiceNode = {
+			type: "choice",
+			name: node.name,
+			thenbranch: newthenbranch,
+			elsebranch: newelsebranch
+		};
+
 		//found is used to see if any selections have been made - if this is a brand new dimension, default both branches to shown
 		var found = false;
 		var selection;
@@ -204,18 +213,18 @@ class ViewRewriter extends SyntaxRewriter {
 
 		//see if this alternative should be displayed
 		if(!found || selection['thenbranch']) {
-			node.thenbranch = this.rewriteRegion(node.thenbranch);
+			newNode.thenbranch = this.rewriteRegion(node.thenbranch);
 		} else {
-			node.thenbranch = {type: "region", segments: []};
+			newNode.thenbranch = {type: "region", segments: []};
 		}
 
 		//see if this alternative should be displayed
 		if(!found || selection['elsebranch']) {
-			node.elsebranch = this.rewriteRegion(node.thenbranch);
+			newNode.elsebranch = this.rewriteRegion(node.elsebranch);
 		} else {
-			node.elsebranch = {type: "region", segments: []};
+			newNode.elsebranch = {type: "region", segments: []};
 		}
-		return [node];
+		return [newNode	];
 	}
 }
 
