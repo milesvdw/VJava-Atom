@@ -1,0 +1,3 @@
+[submodule "variational-compiler"]
+	path = variational-compiler
+	url = https://github.com/RikkiGibson/variational-compiler.git

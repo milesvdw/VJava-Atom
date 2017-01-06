@@ -18,5 +18,8 @@
     "@types/spectrum": "^1.5.28",
     "jquery": "^2.2.4",
     "spectrum-colorpicker": "^1.8.0"
+  },
+  "scripts": {
+    "start": "sh start.sh"
   }
 }

@@ -1,6 +1,0 @@
-{
-  "program": [{"span":{"start":[1,1],"end":[5,9]},"content":"public class HelloWorld {\n\n    public static void main(String[] args) {\n        // Prints \"Hello, World\" to the terminal window.\n        ","type":"text"},{"span":{"start":[5,9],"end":[15,1]},"dimension":"SHORT","left":[{"span":{"start":[5,25],"end":[7,9]},"content":"\n        System.out.println(\"Hi\");\n        ","type":"text"}],"right":[{"span":{"start":[8,1],"end":[9,13]},"content":"        System.out.println(\"Hello, World\");\n            ","type":"text"},{"span":{"start":[9,13],"end":[14,1]},"dimension":"BYE","left":[{"span":{"start":[9,27],"end":[11,13]},"content":"\n            System.out.println(\"Bye\");\n            ","type":"text"}],"right":[{"span":{"start":[12,1],"end":[13,13]},"content":"            System.out.println(\"Goodbye, World\");\n            ","type":"text"}],"type":"choice"},{"span":{"start":[14,1],"end":[14,9]},"content":"        ","type":"text"}],"type":"choice"},{"span":{"start":[15,1],"end":[19,1]},"content":"\n    }\n\n}\n","type":"text"}],
-    "selections": [
-      { "dimension": "SHORT", "alternative": "left" }]}
-
-	  

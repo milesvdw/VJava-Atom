@@ -1,11 +1,13 @@
 {
 	"compileOnSave": true,
+	"include": ["ts/**/*.ts"],
 	"compilerOptions": {
 		"alwaysStrict": true,
 		"strictNullChecks": false,
 		"allowSyntheticDefaultImports": true,
 		"module": "es6",
 		"target": "es6",
-		"sourceMap": true
+		"sourceMap": false, // TypeScript source maps don't seem to get used by Atom because of 'use babel'
+		"outDir": "lib/"
 	}
 }
