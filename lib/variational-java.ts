@@ -12,7 +12,7 @@ import 'spectrum-colorpicker';
 import { CompositeDisposable } from 'atom';
 import { spawn } from 'child_process';
 import path from 'path';
-import { Span, RegionNode, SegmentNode, ChoiceNode, ContentNode, renderDocument, docToPlainText, ViewRewriter, SpanWalker} from './ast';
+import { Span, RegionNode, SegmentNode, ChoiceNode, ContentNode, renderDocument, docToPlainText, ViewRewriter, SpanWalker, NodeInserter, DimensionDeleter} from './ast';
 import { VJavaUI, DimensionUI, Branch, Selector, Selection, NestLevel } from './ui'
 
 // ----------------------------------------------------------------------------
@@ -389,7 +389,7 @@ class VJava {
       $(`#${dimension.name}-view-elsebranch`).show();
       $(`#${dimension.name}-edit-elsebranch`).hide();
 
-      //remove the elsebranch selection since one has been made
+      //remove the elsebranch selection since we have toggled that off
       this.ui.removeActiveChoice(dimension.name, "elsebranch");
     });
 
@@ -436,8 +436,8 @@ class VJava {
       $(`#${dimension.name}-view-thenbranch`).show();
       $(`#${dimension.name}-edit-thenbranch`).hide();
 
-      //remove the elsebranch selection since one has been made
-      this.ui.removeActiveChoice(dimension.name, "elsebranch");
+      //remove the then selection since it has been toggled off
+      this.ui.removeActiveChoice(dimension.name, "thenbranch");
     });
 
     $(`#${dimension.name}-view-thenbranch`).on('contextmenu', () => {
@@ -645,6 +645,7 @@ class VJava {
             this.nesting.pop();
         }
 
+
     } else {
       node.marker = editor.markBufferRange(node.span);
     }
@@ -657,86 +658,34 @@ class VJava {
       if(sure) {
         //find the dimension and remove it
         for(var i = 0; i < this.ui.dimensions.length; i ++) {
-          if(this.ui.dimensions[i].name = dimName) {
+          if(this.ui.dimensions[i].name === dimName) {
             this.ui.dimensions.splice(i,1);
-            $("#" + dimName).remove();
-            this.promoteBranchesForDimension(dimName);
-            this.updateColors();
+            $("#" + dimName).remove(); //TODO: can I remove this?
           }
         }
+        var selection : Selection = this.getSelectionForDim(dimName);
+        this.deleteDimension(dimName, selection.thenbranch, selection.elsebranch);
+        this.updateEditorText();
       } else {
         return;
       }
   }
 
-  promoteBranchesForDimension(dimName: string) {
-    var editor = atom.workspace.getActiveTextEditor();
-
-    //if no selection made, promote both branches to be safe
-    var thenbranch = true;
-    var elsebranch = true;
-
-    //find the selections that were made to know which branches to promote
-    for (let selection of this.selections) {
-      if (selection.name === dimName) {
-        thenbranch = selection.thenbranch;
-        elsebranch = selection.elsebranch;
-        break;
-      }
-    }
-
-    for(var j = 0; j < this.doc.segments.length; j++) {
-      var segment = this.doc.segments[j];
-      if(segment.type === "choice") {
-        if(segment.name === dimName) {
-          this.doc.segments.splice(j, 1, ... this.promoteBranchForDimensionInNode(segment, editor, dimName, thenbranch, elsebranch));
-        } else {
-          for(var i = 0; i < segment.thenbranch.segments.length; i ++) {
-            var lsegment = segment.thenbranch.segments[i];
-            if(lsegment.type === 'choice' && lsegment.name === dimName) {
-              lsegment.thenbranch.segments.splice(i, 1, ... this.promoteBranchForDimensionInNode(lsegment, editor, dimName, thenbranch, elsebranch));
-            }
-          }
-          for(var i = 0; i < segment.elsebranch.segments.length; i ++) {
-            var rsegment = segment.elsebranch.segments[i];
-            if(rsegment.type === 'choice' && rsegment.name === dimName) {
-              segment.elsebranch.segments.splice(i, 1, ... this.promoteBranchForDimensionInNode(rsegment, editor, dimName, thenbranch, elsebranch));
-            }
-          }
-        }
-      }
-    }
-  }
+	getSelectionForDim(dimName: string) : Selection {
+		for(var sel of this.selections) {
+			if(sel.name === dimName) return sel;
+		}
+		return null;
+	}
 
   //thenbranch and elsebranch represent whether the thenbranch and elsebranch branches should be promoted
   //a value of 'true' indicates that the content in that branch should be promoted
-  promoteBranchForDimensionInNode(node: ChoiceNode, editor: AtomCore.IEditor, dimName: string, thenbranch: boolean, elsebranch: boolean) : SegmentNode[] {
+  deleteDimension(dimName: string, thenbranch: boolean, elsebranch: boolean) {
     //if this is the dimension being promoted, then do that
-    if(node.name === dimName) {
-      //TODO: is this a memory leak? removing references to these objects but perhaps never deleting them
-      var region = [];
-      if(thenbranch) region = region.concat(node.thenbranch);
-      else this.deleteBranch(node.thenbranch, editor);
-      if(elsebranch) region = region.concat(node.elsebranch);
-      else this.deleteBranch(node.elsebranch, editor);
-      return region;
-    }
-
-    //otherwise recurse
-    else {
-      for(var i = 0; i < node.thenbranch.segments.length; i ++) {
-        var lsegment = node.thenbranch.segments[i];
-        if(lsegment.type === 'choice' && lsegment.name === dimName) {
-          node.thenbranch.segments.splice(i, 1, ... this.promoteBranchForDimensionInNode(lsegment, editor, dimName, thenbranch, elsebranch));
-        }
-      }
-      for(var i = 0; i < node.elsebranch.segments.length; i ++) {
-        var rsegment = node.elsebranch.segments[i];
-        if(rsegment.type === 'choice' && rsegment.name === dimName) {
-          node.elsebranch.segments.splice(i, 1, ... this.promoteBranchForDimensionInNode(rsegment, editor, dimName, thenbranch, elsebranch));
-        }
-      }
-    }
+    this.preserveChanges(atom.workspace.getActiveTextEditor());
+    var deleter = new DimensionDeleter(dimName, thenbranch, elsebranch);
+    this.doc = deleter.rewriteRegion(this.doc);
+    this.updateEditorText();
   }
 
   deleteBranch(region: RegionNode, editor: AtomCore.IEditor) {
@@ -851,9 +800,7 @@ class VJava {
     }
     this.adjustForReShow(editor, dimName, 'elsebranch');
     this.updateEditorText();
-    for(var i = 0; i < this.doc.segments.length; i ++) {
-      this.renderDimensionUI(editor, this.doc.segments[i]);
-    }
+
   }
 
   // hide the elsebranch alternative
@@ -866,16 +813,16 @@ class VJava {
       }
     }
     this.updateEditorText();
-    for(var i = 0; i < this.doc.segments.length; i ++) {
-      this.renderDimensionUI(editor, this.doc.segments[i]);
-    }
   }
 
   updateEditorText() {
     var editor = atom.workspace.getActiveTextEditor();
-    var showDoc = new ViewRewriter(this.selections).rewriteRegion(this.doc);
-    new SpanWalker().visitRegion(showDoc);
+    var showDoc = new ViewRewriter(this.selections).rewriteDocument(this.doc);
     editor.setText(renderDocument(showDoc));
+
+    for(var i = 0; i < this.doc.segments.length; i ++) {
+      this.renderDimensionUI(editor, this.doc.segments[i]);
+    }
   }
 
   // show the thenbranch alternative
@@ -889,9 +836,6 @@ class VJava {
     }
     this.adjustForReShow(editor, dimName, 'thenbranch');
     this.updateEditorText();
-    for(var i = 0; i < this.doc.segments.length; i ++) {
-      this.renderDimensionUI(editor, this.doc.segments[i]);
-    }
   }
 
   // hide the thenbranch alternative
@@ -905,9 +849,6 @@ class VJava {
     }
 
     this.updateEditorText();
-    for(var i = 0; i < this.doc.segments.length; i ++) {
-      this.renderDimensionUI(editor, this.doc.segments[i]);
-    }
   }
 
   activate(state) {
@@ -933,11 +874,6 @@ class VJava {
       this.createUI();
 
       this.updateEditorText();
-
-      for(var i = 0; i < this.doc.segments.length; i ++) {
-        this.renderDimensionUI(activeEditor, this.doc.segments[i]);
-      }
-
 
       this.updateColors();
 
@@ -988,142 +924,37 @@ class VJava {
     var lit = 'new dimension';
 
     //we have to grab the zero index for some stupid reason
-    var newRange = activeEditor.insertText(lit)[0];
+    var location = activeEditor.getCursorBufferPosition();
 
-      var marker = activeEditor.markBufferRange(newRange);
-      node.marker = marker;
+    //TODO support inserting nested dimensions?
+    var choice = this.ui.activeChoices[0];
+    var branch: Branch = choice.branch;
+    var dim = choice.name;
 
-      var choice = this.ui.activeChoices[0];
-      var branch: Branch = choice.branch;
-      var dim = choice.name;
-
-      var node: ChoiceNode = {
-        span: {
-          start: [newRange.start.row, newRange.start.column],
-          end: [newRange.end.row+1, newRange.end.column]
-        },
-        name: dim,
-        color: this.ui.sessionColorFor(dim),
-        type: 'choice',
-        thenbranch: {segments: [], type: "region"},
-        elsebranch: {segments: [], type: "region"}
-      }
-
-      var newspan: Span = {
-        start: [newRange.start.row+1, newRange.start.column],
-        end: [newRange.end.row+2, newRange.end.column]
-      };
+    var node: ChoiceNode = {
+      span: null, // we don't know what it's span will be
+      name: dim,
+      color: this.ui.sessionColorFor(dim),
+      type: 'choice',
+      thenbranch: {segments: [], type: "region"},
+      elsebranch: {segments: [], type: "region"}
+    }
 
       node[branch].segments = [
         {
-          span: newspan,
-          marker: activeEditor.markBufferRange(newRange),
+          span: null, //no idea what this will be
+          marker: null,// do this later?
           content: '\n' + lit,
           type: 'text'
         }
       ];
 
-      this.insertVNode(node);
+      this.preserveChanges(activeEditor);
+      var inserter = new NodeInserter(node, location, activeEditor);
+      this.doc = inserter.rewriteDocument(this.doc);
       this.updateEditorText();
 
-      for(var i = 0; i < this.doc.segments.length; i ++) {
-        this.renderDimensionUI(activeEditor, this.doc.segments[i]);
-      }
-
       this.updateColors();
-  }
-
-  insertVNode(node: ChoiceNode) {
-      linesReAdded = 0;
-
-      for(var i = 0; i < this.doc.segments.length; i++) {
-        var ret = this.insertVNodeAt(this.doc.segments[i], node);
-        //found it, do the insertion
-        if(ret) {
-          this.doc.segments.splice(i, 1, ret.first, ret.second, ret.third);
-          i = i + 2;
-        }
-      }
-  }
-
-  insertVNodeAt(here: SegmentNode, node: ChoiceNode) : {first: SegmentNode, second: SegmentNode, third: SegmentNode} {
-      var activeEditor = atom.workspace.getActiveTextEditor();
-
-      if(here.marker) here.span = rangeToSpan(here.marker.getBufferRange());
-      here.span.start[0] = here.span.start[0] + linesReAdded;
-
-      var found;
-
-      if(here.type === 'text') {
-          if(here.span.start[0] <= node.span.start[0] && here.span.end[0]+1 >= node.span.end[0]) { //we must slice open this node
-
-              //if we added a thenbranch alternative, we need 2 lines. if we added a elsebranch alternative, we require 3 lines
-              var added: number = (node.thenbranch.segments.length > 0) ? 3 : 4;
-              linesReAdded = linesReAdded + added;
-              var firstRange: Span = {
-                start: here.span.start,
-                end: node.span.start
-              };
-
-              var firstContent: string = activeEditor.getTextInBufferRange(firstRange);
-
-              //slice creates a copy so we can modify safely
-              var thirdStart: number[] = node.span.end.slice(0, 2);
-              thirdStart[0] = thirdStart[0] - 1;
-              var thirdContent: string = activeEditor.getTextInBufferRange([thirdStart,here.span.end]);
-
-              node.span.end[0] = node.span.end[0] + 1; //bump it down one to account for the extra newline inserted upon rendering document
-
-              var thirdRange: Span = {
-                start: node.span.end,
-                end: here.span.end
-              };
-              //do this manually since it won't get hit by the tree recursion
-              thirdRange.end[0] = thirdRange.end[0] + linesReAdded;
-
-              var first: ContentNode = {
-                span: firstRange,
-                marker: activeEditor.markBufferRange(firstRange),
-                content: firstContent,
-                type: 'text'
-              };
-              var second: ChoiceNode = node;
-              var third: ContentNode = {
-                span: thirdRange,
-                marker: activeEditor.markBufferRange(thirdRange),
-                content: thirdContent,
-                type: 'text'
-              };
-
-              found = {
-                first: first,
-                second: second,
-                third: third,
-              };
-        } else {
-          found = false;
-        }
-    } else {
-        for(var i = 0; i < here.thenbranch.segments.length; i++) {
-          var ret = this.insertVNodeAt(here.thenbranch.segments[i], node);
-          //found it, do the insertion
-          if(ret) {
-            here.thenbranch.segments.splice(i, 1, ret.first, ret.second, ret.third);
-            i = i + 2;
-          }
-        }
-
-        for(var i = 0; i < here.elsebranch.segments.length; i++) {
-          var ret = this.insertVNodeAt(here.elsebranch.segments[i], node);
-          if(ret) {
-            here.elsebranch.segments.splice(i, 1, ret.first, ret.second, ret.third);
-            i = i + 2;
-          }
-        }
-        found = false;
-    }
-    if(!found) here.span.end[0] = here.span.end[0] + linesReAdded;
-    return found;
   }
 
   toggle() {
@@ -1148,11 +979,6 @@ class VJava {
         this.createUI();
 
         this.updateEditorText();
-
-        for(var i = 0; i < this.doc.segments.length; i ++) {
-          this.renderDimensionUI(activeEditor, this.doc.segments[i]);
-        }
-
 
         this.updateColors();
 

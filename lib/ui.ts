@@ -34,6 +34,13 @@ export class VJavaUI {
 		return false;
 	}
 
+	getSelectionForDim(dimName: string) : Selection {
+		for(var sel in this.selections) {
+			if(sel.name === dimName) return sel;
+		}
+		return null;
+	}
+
 	sessionColorFor(name: string): string {
 		for(let dim of this.session) {
 			if(dim.name === name) return dim.color;

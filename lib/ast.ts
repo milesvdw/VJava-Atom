@@ -219,6 +219,99 @@ export class ViewRewriter extends SyntaxRewriter {
 	}
 }
 
+export class NodeInserter extends SyntaxRewriter {
+
+	constructor(public newNode: SegmentNode, public location: TextBuffer.IPoint, public editor: AtomCore.IEditor) {
+		super();
+	}
+
+	rewriteDocument(doc : RegionNode) {
+		//walk the span before and after we do the change, because spans have semantic meaning here
+		const walker = new SpanWalker();
+		walker.visitRegion(doc);
+		const newDoc = this.rewriteRegion(doc);
+		walker.visitRegion(newDoc);
+		return newDoc;
+	}
+
+	rewriteRegion(region: RegionNode) : RegionNode {
+		var newSegments: SegmentNode[] = []
+		for(var segment of region.segments) {
+			if(spanContainsPoint(segment.span, this.location)) {
+				if(segment.type === 'choice') {
+					newSegments = newSegments.concat(this.rewriteChoice(segment));
+				} else {
+					newSegments = newSegments.concat(this.rewriteContent(segment));
+				}
+			} else {
+				newSegments.push(segment);
+			}
+		}
+		var newRegion : RegionNode = {segments: newSegments, type: "region", span: region.span};
+		return newRegion;
+	}
+
+	rewriteContent(node: ContentNode) : SegmentNode[] {
+		const firstRange : Span = {
+                start: node.span.start,
+                end: [this.location.row, this.location.column]
+              };
+		const secondRange : Span = {
+                start: [this.location.row, this.location.column],
+                end: node.span.end
+              };
+
+		const first : ContentNode= {
+			type: "text",
+			content: this.editor.getTextInBufferRange(firstRange) + '\n'
+		}
+		const third : ContentNode = {
+			type: "text",
+			content: this.editor.getTextInBufferRange(secondRange)
+		}
+		return [first, this.newNode, third];
+	}
+
+}
+
+export class DimensionDeleter extends SyntaxRewriter {
+	constructor(public dimName : string, public includeThen : boolean, public includeElse : boolean) {
+		super();
+	}
+
+	rewriteChoice(node: ChoiceNode) : SegmentNode[] {
+		if(node.name != this.dimName) return [node]; // make no changes unless this is the dimension being deleted
+		var newNodes = [];
+		if(this.includeThen && node.kind === 'positive') {
+			for(var oldNode of node.thenbranch.segments) {
+				newNodes = newNodes.concat(this.rewriteNode(oldNode));
+			}
+		}
+		if(this.includeThen && node.kind === 'contrapositive') {
+			for(var oldNode of node.elsebranch.segments) {
+				newNodes = newNodes.concat(this.rewriteNode(oldNode));
+			}
+		}
+		if(this.includeElse && node.kind === 'positive') {
+			for(var oldNode of node.elsebranch.segments) {
+				newNodes = newNodes.concat(this.rewriteNode(oldNode));
+			}
+		}
+
+		if(this.includeElse && node.kind === 'contrapositive') {
+			for(var oldNode of node.thenbranch.segments) {
+				newNodes = newNodes.concat(this.rewriteNode(oldNode));
+			}
+		}
+		return newNodes;
+	}
+
+	rewriteNode(node: SegmentNode) : SegmentNode[] {
+		if(node.type === 'choice') return this.rewriteChoice(node);
+		else return this.rewriteContent(node);
+	}
+}
+
 class SimplifierRewriter extends SyntaxRewriter {
 
 	rewriteRegion(region: RegionNode): RegionNode {
@@ -253,7 +346,17 @@ class SimplifierRewriter extends SyntaxRewriter {
 	}
 }
 
-
+function spanContainsPoint(outer: Span, inner: TextBuffer.IPoint) : boolean {
+	return (
+		((outer.start[0] === inner.row && outer.start[1] < inner.column) // exclusive at the beginning, inclusive at the end
+	  ||
+		(outer.start[0] < inner.row)) // if the outer span starts before the second Span
+		&&
+		((outer.end[0] > inner.row)
+		||
+		(outer.end[1] > inner.column && outer[1] === inner.column))
+	)
+}
 
 export function renderDocument(region: RegionNode) : string {
 	return region.segments.reduce(renderContents, '');
