@@ -70,7 +70,7 @@ export abstract class SyntaxWalker {
  * Overwrites spans in-place in a document.
  */
 export class SpanWalker extends SyntaxWalker {
-	currentPos: [number, number] = [0,0]; // atom positions start at [1,1], elsebranch?
+	currentPos: [number, number] = [0,0];
 
 	accumulate(pos: Pos, str: string): Pos {
 		const newlineMatches = str.match(/\n/g) || [];
@@ -81,7 +81,7 @@ export class SpanWalker extends SyntaxWalker {
 		if (lastNewlineIndex === -1) {
 			endPos = [pos[0], pos[1] + str.length];
 		} else {
-			endPos = [pos[0] + newlineCount, str.length - lastNewlineIndex];
+			endPos = [pos[0] + newlineCount, str.length - lastNewlineIndex - 1];
 		}
 
 		return endPos;
@@ -101,16 +101,8 @@ export class SpanWalker extends SyntaxWalker {
 	visitChoice(node: ChoiceNode): void {
 		const startPos = this.currentPos;
 
-		// assume that choice syntax consumes a line (yay assumptions!)
-		this.currentPos = this.accumulate(startPos, "\n"); // #ifdef
 		this.visitRegion(node.thenbranch);
-
-		// assumption to test if the #else syntax exists
-		if (node.elsebranch.segments.length !== 0) {
-			this.currentPos = this.accumulate(this.currentPos, "\n"); // #else
-			this.visitRegion(node.elsebranch);
-		}
-		this.currentPos = this.accumulate(this.currentPos, "\n"); // #endif
+		this.visitRegion(node.elsebranch);
 
 		node.span = {
 			start: startPos,
@@ -185,8 +177,7 @@ abstract class SyntaxRewriter {
 }
 
 export class ViewRewriter extends SyntaxRewriter {
-
-	constructor(public selections: Selection[]) {
+    constructor(public selections: Selection[]) {
 		super();
 	}
 
@@ -215,16 +206,16 @@ export class ViewRewriter extends SyntaxRewriter {
 		if(!found || selection['thenbranch']) {
 			newNode.thenbranch = this.rewriteRegion(node.thenbranch);
 		} else {
-			newNode.thenbranch = {type: "region", segments: []};
+			newNode.thenbranch = { type: "region", segments: [] };
 		}
 
 		//see if this alternative should be displayed
 		if(!found || selection['elsebranch']) {
 			newNode.elsebranch = this.rewriteRegion(node.elsebranch);
 		} else {
-			newNode.elsebranch = {type: "region", segments: []};
+			newNode.elsebranch = { type: "region", segments: [] };
 		}
-		return [newNode	];
+		return [newNode];
 	}
 }
 
@@ -262,6 +253,8 @@ class SimplifierRewriter extends SyntaxRewriter {
 	}
 }
 
+
+
 export function renderDocument(region: RegionNode) : string {
 	return region.segments.reduce(renderContents, '');
 }
@@ -297,46 +290,3 @@ function nodeToPlainText(acc: string, node: SegmentNode) : string {
 		return acc + node.content
 	}
 }
-
-function test() {
-	const rew = new SimplifierRewriter();
-	const doc: RegionNode = {
-		type: "region",
-		segments: [
-			{
-				type: "text",
-				content: "foo"
-			},
-			{
-				type: "text",
-				content: "bar\n"
-			},
-			{
-				type: "choice",
-				name: "test",
-				thenbranch: {
-					type: "region",
-					segments: [
-						{
-							type: "text",
-							content: "foo"
-						},
-						{
-							type: "text",
-							content: "bar\n"
-						}
-					]
-				},
-				elsebranch: {
-					type: "region",
-					segments: []
-				}
-			}
-		]
-	};
-
-	const newDoc = rew.rewriteDocument(doc);
-	console.log(JSON.stringify(newDoc));
-}
-
-test();

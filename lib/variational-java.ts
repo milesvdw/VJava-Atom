@@ -10,7 +10,8 @@ declare module 'atom' {
 import $ from 'jquery';
 import 'spectrum-colorpicker';
 import { CompositeDisposable } from 'atom';
-import { exec } from 'child_process';
+import { spawn } from 'child_process';
+import path from 'path';
 import { Span, RegionNode, SegmentNode, ChoiceNode, ContentNode, renderDocument, docToPlainText, ViewRewriter, SpanWalker} from './ast';
 import { VJavaUI, DimensionUI, Branch, Selector, Selection, NestLevel } from './ui'
 
@@ -818,28 +819,22 @@ class VJava {
     node.span.end[0] = node.span.end[0] + linesReAdded;
   }
 
-  //query the back-end parser, and call parseDimension where necessary
-  parseVJava(textContents: string, next: Function) {
-    //send file contents to the backend, receive jsonified output
-    var packagePath = atom.packages.resolvePackagePath("variational-java") + "/lib";
-    exec('cd ' + packagePath);
+  parseVJava(textContents: string, next: () => void) {
+    const packagePath = atom.packages.resolvePackagePath("variational-java");
+    const parserPath = path.resolve(packagePath, "lib", "variational-parser");
 
-    var spawn = require('child_process').spawn;
-    var parser = spawn('variational-parser',[],{ cwd: packagePath });
-
-    parser.stdout.setEncoding('utf8');
-    parser.stdout.on('data', (data) => {
+    const parserProcess = spawn(parserPath, [], { cwd: packagePath });
+    parserProcess.stdout.setEncoding('utf8');
+    parserProcess.stdout.on('data', (data) => {
       this.doc = JSON.parse(data.toString());
       next();
     });
-    parser.on('exit', (code) => {
+    parserProcess.on('exit', (code) => {
       console.log('child process exited with code ' + code);
     });
 
-    parser.stdin.write(textContents);
-    parser.stdin.end();
-
-    return;
+    parserProcess.stdin.write(textContents);
+    parserProcess.stdin.end();
   }
 
   // these four functions execute a put with the old selections,
