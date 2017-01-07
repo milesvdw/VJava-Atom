@@ -12,7 +12,9 @@ import 'spectrum-colorpicker';
 import { CompositeDisposable } from 'atom';
 import { spawn } from 'child_process';
 import path from 'path';
-import { Span, RegionNode, SegmentNode, ChoiceNode, ContentNode, renderDocument, docToPlainText, ViewRewriter, SpanWalker, NodeInserter, DimensionDeleter} from './ast';
+import { Span, RegionNode, SegmentNode, ChoiceNode, ContentNode, renderDocument,
+       docToPlainText, ViewRewriter, SpanWalker, NodeInserter, DimensionDeleter,
+       EditPreserver, getSelectionForDim, getSelectionForNode, isBranchActive} from './ast';
 import { VJavaUI, DimensionUI, Branch, Selector, Selection, NestLevel } from './ui'
 
 // ----------------------------------------------------------------------------
@@ -228,7 +230,7 @@ class VJava {
   }
 
   getChoiceColumnRange(choice: RegionNode) {
-    if(choice.segments.length < 1) return [0,-1]; //hack to prevent empty alternatives from bumping things around
+    if(choice.segments.length < 1 || choice.hidden) return [0,-1]; //hack to prevent empty alternatives from bumping things around
     return [choice.segments[0].span.start[0],choice.segments.last().span.end[0]];
   }
 
@@ -452,58 +454,6 @@ class VJava {
     });
   }
 
-  thenbranchainText(editor: AtomCore.IEditor) {
-      var finalContents = [];
-      for(var i = 0; i < this.doc.segments.length; i ++) {
-        finalContents.push(this.nodeToPlainText(this.doc.segments[i], editor, false));
-      }
-      return finalContents.join('');
-  }
-
-  nodeToPlainText(node: SegmentNode, editor: AtomCore.IEditor, useOldContent: boolean) {
-    if(node.type === 'choice') {
-      var found = false;
-      var selection;
-      for (var i = 0; i < this.selections.length; i ++) {
-        if (this.selections[i].name === node.name) {
-          found = true;
-          selection = this.selections[i];
-          break;
-        }
-      }
-
-      var contents = `\n#ifdef ${node.name}`;
-      useOldContent = found && !selection['thenbranch'];
-
-      for(var j = 0; j < node.thenbranch.segments.length; j ++) {
-        var blob = this.nodeToPlainText(node.thenbranch.segments[j], editor, useOldContent);
-        //add an extra newline if text was added on the first line
-        if(j == 0 && blob[0] != '\n') {
-          blob = '\n' + blob;
-        }
-        contents = contents + blob;
-      }
-
-      useOldContent = found && !selection['elsebranch'];
-      if(node.elsebranch.segments.length > 0) {
-        contents = contents + '\n#else';
-        for(var j = 0; j < node.elsebranch.segments.length; j ++) {
-          var blob = this.nodeToPlainText(node.elsebranch.segments[j], editor, useOldContent);
-          if(j == 0 && blob[0] != '\n') {
-            blob = '\n' + blob;
-          }
-          contents = contents + blob;
-        }
-      }
-      return contents + '\n#endif';
-
-    } else {
-      //if this node is currently hidden, use its stored content instead of the range, will will be incorrect
-      if(useOldContent) return node.content;
-      else return editor.getTextInBufferRange(node.marker.getBufferRange());
-    }
-  }
-
   updateSelections(selection: Selection) {
     for(let sel of this.selections) {
       if(sel.name === selection.name) {
@@ -608,7 +558,7 @@ class VJava {
         }
 
 
-        if((!found || selection['thenbranch']) && node.thenbranch.segments.length > 0) {
+        if(isBranchActive(node, getSelectionForNode(node, this.selections), "thenbranch") && node.thenbranch.segments.length > 0 && !node.thenbranch.hidden) {
             //add markers for this new range of a (new or pre-existing) dimension
             var thenbranchRange = editor.markBufferRange(this.getChoiceRange(node.thenbranch));
 
@@ -628,7 +578,7 @@ class VJava {
             this.nesting.pop();
         }
 
-        if((!found || selection['elsebranch']) && node.elsebranch.segments.length > 0) {
+        if(isBranchActive(node, getSelectionForNode(node, this.selections), "elsebranch") && node.elsebranch.segments.length > 0 && !node.thenbranch.hidden) {
 
             var elsebranchRange = editor.markBufferRange(this.getChoiceRange(node.elsebranch));
 
@@ -663,27 +613,20 @@ class VJava {
             $("#" + dimName).remove(); //TODO: can I remove this?
           }
         }
-        var selection : Selection = this.getSelectionForDim(dimName);
-        this.deleteDimension(dimName, selection.thenbranch, selection.elsebranch);
+        var selection : Selection = getSelectionForDim(dimName, this.selections);
+        this.deleteDimension(selection);
         this.updateEditorText();
       } else {
         return;
       }
   }
 
-	getSelectionForDim(dimName: string) : Selection {
-		for(var sel of this.selections) {
-			if(sel.name === dimName) return sel;
-		}
-		return null;
-	}
-
   //thenbranch and elsebranch represent whether the thenbranch and elsebranch branches should be promoted
   //a value of 'true' indicates that the content in that branch should be promoted
-  deleteDimension(dimName: string, thenbranch: boolean, elsebranch: boolean) {
+  deleteDimension(selection: Selection) {
     //if this is the dimension being promoted, then do that
     this.preserveChanges(atom.workspace.getActiveTextEditor());
-    var deleter = new DimensionDeleter(dimName, thenbranch, elsebranch);
+    var deleter = new DimensionDeleter(selection);
     this.doc = deleter.rewriteRegion(this.doc);
     this.updateEditorText();
   }
@@ -700,39 +643,8 @@ class VJava {
   }
 
   preserveChanges(editor: AtomCore.IEditor) {
-    for(var i = 0; i < this.doc.segments.length; i++) {
-      this.preserveChangesonNode(editor, this.doc.segments[i]);
-    }
-  }
-
-  preserveChangesonNode(editor: AtomCore.IEditor, node: SegmentNode) {
-    if(node.type === 'choice') {
-      //found is used to see if any selections have been made - if this is a brand new dimension, default both branches to shown
-      var found = false;
-      var selection;
-      for (var i = 0; i < this.selections.length; i ++) {
-        if (this.selections[i].name === node.name) {
-          found = true;
-          selection = this.selections[i];
-          break;
-        }
-      }
-      if(!found || selection['thenbranch']) {
-        for(var j = 0; j < node.thenbranch.segments.length; j ++) {
-          this.preserveChangesonNode(editor, node.thenbranch.segments[j]);
-        }
-      }
-      if(!found || selection['elsebranch']) {
-        for(var j = 0; j < node.elsebranch.segments.length; j ++) {
-          this.preserveChangesonNode(editor, node.elsebranch.segments[j]);
-        }
-      }
-
-
-    } else {
-      node.content = editor.getTextInBufferRange(node.marker.getBufferRange());
-      node.span = rangeToSpan(node.marker.getBufferRange());
-    }
+    var preserver: EditPreserver = new EditPreserver(editor, this.selections);
+    preserver.visitRegion(this.doc);
   }
 
   adjustForReShow(editor: AtomCore.IEditor, dimension: string, branch: Branch) {
@@ -960,7 +872,7 @@ class VJava {
   toggle() {
     var activeEditor = atom.workspace.getActiveTextEditor();
     if(this.ui.panel.isVisible()) {
-
+      this.preserveChanges(activeEditor);
       this.ui.panel.destroy();
       this.ui.dimensions = [];
 

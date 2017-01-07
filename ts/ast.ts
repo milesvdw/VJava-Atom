@@ -1,6 +1,6 @@
 'use babel'
 
-import {Selection} from './ui';
+import {Selection, Branch} from './ui';
 
 type Pos = [number, number]; // row, column
 
@@ -36,6 +36,7 @@ export interface RegionNode {
 	type: "region";
 	segments: SegmentNode[];
 	span?: Span;
+	hidden?: boolean;
 }
 
 export type SegmentNode = ContentNode | ChoiceNode;
@@ -112,12 +113,16 @@ export class SpanWalker extends SyntaxWalker {
 
 	visitRegion(node: RegionNode): void {
 		const startPos = this.currentPos;
-		super.visitRegion(node);
+		if(node.hidden) {
+				node.span = null;
+		} else {
+			super.visitRegion(node);
 
-		node.span = {
-			start: startPos,
-			end: this.currentPos
-		};
+			node.span = {
+				start: startPos,
+				end: this.currentPos
+			};
+		}
 	}
 }
 
@@ -191,29 +196,20 @@ export class ViewRewriter extends SyntaxRewriter {
 			elsebranch: newelsebranch
 		};
 
-		//found is used to see if any selections have been made - if this is a brand new dimension, default both branches to shown
-		var found = false;
-		var selection;
-		for (var i = 0; i < this.selections.length; i ++) {
-			if (this.selections[i].name === node.name) {
-				found = true;
-				selection = this.selections[i];
-				break;
-			}
-		}
-
 		//see if this alternative should be displayed
-		if(!found || selection['thenbranch']) {
+		if(isBranchActive(node, getSelectionForNode(node, this.selections), "thenbranch")) {
 			newNode.thenbranch = this.rewriteRegion(node.thenbranch);
 		} else {
-			newNode.thenbranch = { type: "region", segments: [] };
+			newNode.thenbranch = Object.assign({}, node.thenbranch);
+			newNode.thenbranch.hidden = true;
 		}
 
 		//see if this alternative should be displayed
-		if(!found || selection['elsebranch']) {
+		if(isBranchActive(node, getSelectionForNode(node, this.selections), "elsebranch")) {
 			newNode.elsebranch = this.rewriteRegion(node.elsebranch);
 		} else {
-			newNode.elsebranch = { type: "region", segments: [] };
+			newNode.elsebranch = Object.assign({}, node.elsebranch);
+			newNode.elsebranch.hidden = true;
 		}
 		return [newNode];
 	}
@@ -274,35 +270,66 @@ export class NodeInserter extends SyntaxRewriter {
 
 }
 
+export class EditPreserver extends SyntaxWalker {
+	constructor(public editor: AtomCore.IEditor, public selections: Selection[]) {
+		super();
+	}
+
+	visitContent(node: ContentNode): void {
+		node.content = this.editor.getTextInBufferRange(node.marker.getBufferRange());
+	}
+
+	visitChoice(node: ChoiceNode): void {
+		var selection = getSelectionForNode(node, this.selections);
+		if(isBranchActive(node, selection, "thenbranch") && !node.thenbranch.hidden) {
+			this.visitRegion(node.thenbranch);
+		}
+		if(isBranchActive(node, selection, "elsebranch") && !node.elsebranch.hidden) {
+			this.visitRegion(node.elsebranch);
+		}
+	}
+}
+
+export function getSelectionForNode(node: ChoiceNode, selections: Selection[]) : Selection {
+	return getSelectionForDim(node.name, selections);
+}
+
+export function getSelectionForDim(dimName: string, selections: Selection[]): Selection {
+	for(var sel of selections) {
+		if(sel.name === dimName) return sel;
+	}
+	return {name: dimName, thenbranch: true, elsebranch: true};
+}
+
+export function isBranchActive(node, selection: Selection, branch: Branch) {
+	if(selection) {
+		return selection.thenbranch && branch === "thenbranch" && node.kind === "positive"
+					|| selection.thenbranch && branch === "elsebranch" && node.kind === "contrapositive"
+					|| selection.elsebranch && branch === "elsebranch" && node.kind === "positive"
+					|| selection.elsebranch && branch === "thenbranch" && node.kind === "contrapositive"
+	} else return false;
+}
+
+
 export class DimensionDeleter extends SyntaxRewriter {
-	constructor(public dimName : string, public includeThen : boolean, public includeElse : boolean) {
+	constructor(public selection: Selection) {
 		super();
 	}
 
 	rewriteChoice(node: ChoiceNode) : SegmentNode[] {
-		if(node.name != this.dimName) return [node]; // make no changes unless this is the dimension being deleted
+		if(node.name != this.selection.name) return [node]; // make no changes unless this is the dimension being deleted
 		var newNodes = [];
-		if(this.includeThen && node.kind === 'positive') {
+		if(isBranchActive(node, this.selection, "thenbranch")) {
 			for(var oldNode of node.thenbranch.segments) {
-				newNodes = newNodes.concat(this.rewriteNode(oldNode));
+				newNodes.push(... this.rewriteNode(oldNode));
 			}
 		}
-		if(this.includeThen && node.kind === 'contrapositive') {
-			for(var oldNode of node.elsebranch.segments) {
-				newNodes = newNodes.concat(this.rewriteNode(oldNode));
-			}
-		}
-		if(this.includeElse && node.kind === 'positive') {
-			for(var oldNode of node.elsebranch.segments) {
-				newNodes = newNodes.concat(this.rewriteNode(oldNode));
+		if(isBranchActive(node, this.selection, "elsebranch")) {
+			for(var oldNode of node.thenbranch.segments) {
+				newNodes.push(... this.rewriteNode(oldNode));
 			}
 		}
 
-		if(this.includeElse && node.kind === 'contrapositive') {
-			for(var oldNode of node.thenbranch.segments) {
-				newNodes = newNodes.concat(this.rewriteNode(oldNode));
-			}
-		}
 		return newNodes;
 	}
 
@@ -364,7 +391,9 @@ export function renderDocument(region: RegionNode) : string {
 
 function renderContents(acc: string, node: SegmentNode) : string {
 	if (node.type === 'choice') {
-		return acc + renderDocument(node.thenbranch) + renderDocument(node.elsebranch);
+		if(!node.thenbranch.hidden) acc = acc + renderDocument(node.thenbranch);
+		if(!node.elsebranch.hidden) acc = acc + renderDocument(node.elsebranch);
+		return acc;
 	}
 	else {
 		return acc + node.content;
@@ -375,7 +404,7 @@ export function docToPlainText(region: RegionNode) : string {
 	return region.segments.reduce(nodeToPlainText, '');
 }
 
-function nodeToPlainText(acc: string, node: SegmentNode) : string {
+export function nodeToPlainText(acc: string, node: SegmentNode) : string {
 	if(node.type === 'choice') {
 		var syntax = ''
 		if(node.kind === 'positive') syntax = '#ifdef';
