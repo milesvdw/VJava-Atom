@@ -1,0 +1,10 @@
+'.text.java, .source.java':
+  'Dimension':
+    'prefix':'dim'
+    'body': '''
+      \#dimension $1
+      $2
+      \#else
+      $3
+      \#end
+    '''

@@ -97,6 +97,14 @@ atom-text-editor::shadow .unselected {
 	color: @text-color
 }
 
+atom-text-editor::shadow .left-choice {
+ 		color: spin(desaturate(@text-color, 10%), 120)
+}
+
+atom-text-editor::shadow .right-choice {
+	color: spin(desaturate(@text-color, 10%), 240)
+}
+
 atom-text-editor::shadow .left-choice-selected {
 		color: spin(@text-color, 120);
 		font-weight: bold;
@@ -107,13 +115,16 @@ atom-text-editor::shadow .right-choice-selected {
 		font-weight: bold;
 }
 
-atom-text-editor::shadow .left-choice {
- 		color: spin(desaturate(@text-color, 10%), 120)
+atom-text-editor::shadow .left-choice:hover {
+		color: spin(@text-color, 120);
+		font-weight: bold;
 }
 
-atom-text-editor::shadow .right-choice {
-	color: spin(desaturate(@text-color, 10%), 240)
+atom-text-editor::shadow .right-choice:hover {
+		color: spin(@text-color, 240);
+		font-weight: bold;
 }
+
 
 atom-text-editor::shadow .dimension-marker-HI-left {
 

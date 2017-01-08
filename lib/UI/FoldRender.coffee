@@ -5,13 +5,16 @@ Keeps the state of where folds are and offers a handler to fold lines on gutter 
 ###
 class FoldHandler
 	ranges: {}
+
+	#for disposing
+	markers: []
+
 	editor: null
 	constructor: (editor) ->
 		@editor = editor;
 
-	addFold: (row, range) ->
+	addFold: (row, range, marker) ->
 		@ranges[row] = range;
-
 	###
 	Add this to a gutter click handler to handle folding.
 	###
@@ -32,16 +35,17 @@ class FoldRender
 	###
 	editor: null
 	foldHandler: null
+	markers: []
 	constructor: (editor) ->
 		@editor = editor;
 		@foldHandler = new FoldHandler(editor);
 
 	initEvents: ->
-			editorView = atom.views.getView(@editor);
-			gutter = editorView.shadowRoot.querySelector('.gutter');
+		editorView = atom.views.getView(@editor);
+		gutter = editorView.shadowRoot.querySelector('.gutter');
 
-			#atom will handle unfolding, we only need to handle refolding.
-			$(gutter).on('click', '.foldable:not(.folded)', @foldHandler.gutterHandler);
+		#atom will handle unfolding, we only need to handle refolding.
+		$(gutter).on('click', '.foldable:not(.folded)', @foldHandler.gutterHandler);
 
 	###
 	Fold all the choices in elements, as well as fold the choice element, and fold the choices inside those choices.
@@ -61,6 +65,15 @@ class FoldRender
 				@foldChoices(node.left)
 				@foldChoices(node.right);
 
+	derenderFolds: ->
+		@editor.unfoldAll();
+		editorView = atom.views.getView(@editor);
+		gutter = editorView.shadowRoot.querySelector('.gutter');
+
+		$(gutter).off('click', '.foldable:not(.folded)', @foldHandler.gutterHandler);
+		for marker in @markers
+			marker.destroy();
+		@markers = [];
 	###
 	Add a fold toggle to the given row that will open and close the given range.
 	###
@@ -68,6 +81,7 @@ class FoldRender
 		row = range[0][0];
 		marker = @editor.markBufferPosition([row, 0])
 		@editor.decorateMarker(marker, {'type': 'line-number', 'class': 'foldable'})
+		@markers.push(marker);
 		@foldHandler.addFold(row, range)
 
 	###
