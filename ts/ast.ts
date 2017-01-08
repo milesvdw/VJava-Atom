@@ -23,10 +23,9 @@ type ChoiceKind = "positive" | "contrapositive";
 export interface ChoiceNode {
 	type: "choice";
 	name: string;
-	color?: string;
 	thenbranch: RegionNode;
 	elsebranch: RegionNode;
-	kind?: ChoiceKind;
+	kind: ChoiceKind;
 	span?: Span;
 	marker?: AtomCore.IDisplayBufferMarker;
 }
@@ -148,12 +147,10 @@ abstract class SyntaxRewriter {
 	rewriteChoice(node: ChoiceNode): SegmentNode[] {
 		const newthenbranch = this.rewriteRegion(node.thenbranch);
 		const newelsebranch = this.rewriteRegion(node.elsebranch);
-		const newNode: ChoiceNode = {
-			type: "choice",
-			name: node.name,
-			thenbranch: newthenbranch,
-			elsebranch: newelsebranch
-		};
+		const newNode: ChoiceNode = copyFromChoice(node);
+		newNode.thenbranch = newthenbranch;
+		newNode.elsebranch = newelsebranch;
+
 		return [newNode];
 	}
 
@@ -181,6 +178,16 @@ abstract class SyntaxRewriter {
 	}
 }
 
+function copyFromChoice(node: ChoiceNode) : ChoiceNode {
+	return {
+		type: "choice",
+		name: node.name,
+		kind: node.kind,
+		thenbranch: node.thenbranch,
+		elsebranch: node.elsebranch
+	};
+}
+
 export class ViewRewriter extends SyntaxRewriter {
     constructor(public selections: Selection[]) {
 		super();
@@ -189,12 +196,9 @@ export class ViewRewriter extends SyntaxRewriter {
 	rewriteChoice(node: ChoiceNode): ChoiceNode[] {
 		const newthenbranch = this.rewriteRegion(node.thenbranch);
 		const newelsebranch = this.rewriteRegion(node.elsebranch);
-		const newNode: ChoiceNode = {
-			type: "choice",
-			name: node.name,
-			thenbranch: newthenbranch,
-			elsebranch: newelsebranch
-		};
+		const newNode: ChoiceNode = copyFromChoice(node);
+		newNode.thenbranch = newthenbranch;
+		newNode.elsebranch = newelsebranch;
 
 		//see if this alternative should be displayed
 		if(isBranchActive(node, getSelectionForNode(node, this.selections), "thenbranch")) {

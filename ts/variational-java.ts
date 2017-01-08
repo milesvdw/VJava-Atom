@@ -27,6 +27,7 @@ declare global {
     interface IEditor {
       getTextInBufferRange(span: Span) : string;
       getTextInBufferRange(span: number[][]) : string;
+      decorateMarker(marker: any, options: any);
     }
     interface Panel {
       destroy();
@@ -200,163 +201,6 @@ class VJava {
     });
   }
 
-  //update the color of all matching dimensions in the document
-  updateDimensionColor(dimension: DimensionUI) {
-    this.ui.updateSession(dimension);
-    for(var i = 0; i < this.doc.segments.length; i ++) {
-      this.changeDimColor(dimension, this.doc.segments[i]);
-    }
-    this.updateColors();
-  }
-
-  //change this node's color if appropriate, and recurse if necessary
-  changeDimColor(dimension, node) {
-    if(node.type == 'choice') {
-      if(node.name == dimension.name) {
-        node.color = dimension.color;
-      }
-
-      for(var i = 0; i < node.thenbranch.segments.length; i ++) {
-        this.changeDimColor(dimension, node.thenbranch.segments[i]);
-      }
-      for(var i = 0; i < node.elsebranch.segments.length; i ++) {
-        this.changeDimColor(dimension, node.elsebranch.segments[i]);
-      }
-    }
-  }
-
-  getChoiceRange(node: RegionNode) {
-    return [node.segments[0].span.start,node.segments.last().span.end];
-  }
-
-  getChoiceColumnRange(choice: RegionNode) {
-    if(choice.segments.length < 1 || choice.hidden) return [0,-1]; //hack to prevent empty alternatives from bumping things around
-    return [choice.segments[0].span.start[0],choice.segments.last().span.end[0]];
-  }
-
-  clearColors() {
-    $("#ifdef-color-styles").remove();
-  }
-
-  updateColors() {
-    this.clearColors();
-    var colors = '';
-    for(var i = 0; i < this.doc.segments.length; i ++) {
-        colors = colors + this.setColors(this.doc.segments[i]);
-    }
-    $('head').append(`<style id='dimension-color-styles'>${colors}</style>`);
-  }
-
-  setColors(node: SegmentNode) {
-      //if this is a dimension
-      var colors = '';
-      if(node.type === 'choice') {
-          var dimension = node;
-          var color = dimension.color;
-
-          //find the color for the thenbranch alternative
-          if(node.kind === 'positive') {
-            var thenbranchcolor = shadeColor(color, .1);
-            var elsebranchcolor = shadeColor(color, -.1);
-          } else {
-            var thenbranchcolor = shadeColor(color, -.1);
-            var elsebranchcolor = shadeColor(color, .1);
-          }
-
-          var selectors = [];
-          var nestColors = [];
-
-          if(this.nesting.length > 0) {
-            for(var j = 0; j < this.nesting.length; j ++) {
-              //nesting class format: 'nested-[DIM ID]-[BRANCH]-[LEVEL]'
-              selectors.push('.nested-' + this.nesting[j].selector.name + '-' + this.nesting[j].selector.branch + '-' + j);
-              var branch: Branch = this.nesting[j].selector.branch;
-
-              //pre-shading nest color
-              var nestcolor = this.nesting[j].dimension.color;
-              var kind = this.nesting[j].dimension.kind;
-
-              //nest in the correct branch color
-              if((branch === 'thenbranch' && kind === 'positive') || (branch === 'elsebranch' && kind === 'contrapositive')) nestcolor = shadeColor(nestcolor, .1);
-              else nestcolor = shadeColor(nestcolor, -.1);
-
-              nestColors.push(nestcolor);
-            }
-
-            var selector = selectors.join(' ');
-            //construct the nest gradient
-            var x = 0;
-            var increment = 1;
-            var nestGradient = nestColors[0] + ' 0%';
-            for(var j = 1; j < nestColors.length; j++) {
-              x = (j) * increment;
-              nestGradient = `${nestGradient}, ${nestColors[j]} ${x}%`;
-            }
-
-            //add the colors and borders as styles to the document head
-
-            colors = colors +
-            `atom-text-editor::shadow ${selector}.${getthenbranchCssClass(dimension.name)} {
-              background: linear-gradient( 90deg, ${nestGradient}, ${thenbranchcolor} ${x+increment}%);
-            }
-            atom-text-editor::shadow  ${selector}.${getelsebranchCssClass(dimension.name)} {
-              background: linear-gradient( 90deg, ${nestGradient}, ${elsebranchcolor} ${x+increment}%);
-            }`
-          } else {
-            colors = colors +
-            `atom-text-editor::shadow .${getthenbranchCssClass(dimension.name)} {
-              background-color: ${thenbranchcolor};
-            }
-            atom-text-editor::shadow .${getelsebranchCssClass(dimension.name)} {
-              background-color: ${elsebranchcolor};
-            }`
-          }
-
-          //recurse thenbranch and elsebranch
-          var lselector: Selector = {name: node.name, branch: "thenbranch"};
-          this.nesting.push({ selector: lselector, dimension: dimension});
-          //recurse on thenbranch and elsebranch
-          for(var i = 0; i < node.thenbranch.segments.length; i ++) {
-            colors = colors + this.setColors(node.thenbranch.segments[i]);
-          }
-          this.nesting.pop();
-
-          var rselector: Selector = {name: node.name, branch: "elsebranch"}
-          this.nesting.push({ selector: rselector, dimension: dimension});
-          for(var i = 0; i < node.elsebranch.segments.length; i ++) {
-            colors = colors + this.setColors(node.elsebranch.segments[i]);
-          }
-          this.nesting.pop();
-      }
-      return colors;
-  }
-
-  toggleDimensionEdit(dimension: DimensionUI, branch: Branch) {
-    var otherbranch;
-    if(branch === 'thenbranch') otherbranch = 'elsebranch';
-    else otherbranch = 'thenbranch';
-
-    //toggle off
-    if($(`#${dimension.name}-edit-${branch}`).hasClass('edit-enabled')) {
-      $(`#${dimension.name}-edit-${branch}`).removeClass('edit-enabled');
-      $(`#${dimension.name}-edit-${branch}`).addClass('edit-locked');
-      this.ui.removeActiveChoice(dimension.name, branch);
-    } else {
-      //toggle on
-      $(`#${dimension.name}-edit-${branch}`).addClass('edit-enabled');
-      $(`#${dimension.name}-edit-${branch}`).removeClass('edit-locked');
-
-
-      this.ui.updateActiveChoices(dimension.name, branch);
-    }
-    if($(`#${dimension.name}-edit-${otherbranch}`).hasClass('edit-enabled')) {
-      $(`#${dimension.name}-edit-${otherbranch}`).removeClass('edit-enabled');
-      $(`#${dimension.name}-edit-${otherbranch}`).addClass('edit-locked');
-
-      this.ui.removeActiveChoice(dimension.name, branch);
-    }
-  }
-
   addViewListeners(dimension: DimensionUI) {
     $(`#${dimension.name}-disable-elsebranch`).on('click', () => {
       //switch the elsebranch branch to view mode
@@ -454,6 +298,155 @@ class VJava {
     });
   }
 
+  //update the color of all matching dimensions in the document
+  updateDimensionColor(dimension: DimensionUI) {
+    this.ui.updateSession(dimension);
+    for(var i = 0; i < this.doc.segments.length; i ++) {
+      this.changeDimColor(dimension, this.doc.segments[i]);
+    }
+
+    var preserver: EditPreserver = new EditPreserver(atom.workspace.getActiveTextEditor(), this.selections);
+    preserver.visitRegion(this.doc);
+
+    this.updateEditorText(); //TODO find a way to do this without rewriting everything in the editor
+  }
+
+  //change this node's color if appropriate, and recurse if necessary
+  changeDimColor(dimension, node) {
+    if(node.type == 'choice') {
+      if(node.name == dimension.name) {
+        node.color = dimension.color;
+      }
+
+      for(var i = 0; i < node.thenbranch.segments.length; i ++) {
+        this.changeDimColor(dimension, node.thenbranch.segments[i]);
+      }
+      for(var i = 0; i < node.elsebranch.segments.length; i ++) {
+        this.changeDimColor(dimension, node.elsebranch.segments[i]);
+      }
+    }
+  }
+
+  clearColors() {
+    $("#ifdef-color-styles").remove();
+  }
+
+  updateColors(doc: RegionNode) {
+    this.clearColors();
+    var colors = '';
+    for(var i = 0; i < doc.segments.length; i ++) {
+        colors = colors + this.setColors(doc.segments[i]);
+    }
+    $('head').append(`<style id='dimension-color-styles'>${colors}</style>`);
+  }
+
+  setColors(node: SegmentNode) {
+      //if this is a dimension
+      var colors = '';
+      if(node.type === 'choice') {
+          var color = this.ui.getColorForNode(node);
+
+          //find the color for the thenbranch alternative
+          if(node.kind === 'positive') {
+            var thenbranchcolor = shadeColor(color, .1);
+            var elsebranchcolor = shadeColor(color, -.1);
+          } else {
+            var thenbranchcolor = shadeColor(color, -.1);
+            var elsebranchcolor = shadeColor(color, .1);
+          }
+
+          var selectors = [];
+          var nestColors = [];
+
+          if(this.nesting.length > 0) {
+            for(var j = 0; j < this.nesting.length; j ++) {
+              //nesting class format: 'nested-[DIM ID]-[BRANCH]-[LEVEL]'
+              selectors.push('.nested-' + this.nesting[j].selector.name + '-' + this.nesting[j].selector.branch + '-' + j);
+              var branch: Branch = this.nesting[j].selector.branch;
+
+              //pre-shading nest color
+              var nestcolor = this.ui.getColorForNode(this.nesting[j].dimension);
+              var kind = this.nesting[j].dimension.kind;
+
+              //nest in the correct branch color
+              if((branch === 'thenbranch' && kind === 'positive') || (branch === 'elsebranch' && kind === 'contrapositive')) nestcolor = shadeColor(nestcolor, .1);
+              else nestcolor = shadeColor(nestcolor, -.1);
+
+              nestColors.push(nestcolor);
+            }
+
+            var selector = selectors.join(' ');
+            //construct the nest gradient
+            var x = 0;
+            var increment = 1;
+            var nestGradient = nestColors[0] + ' 0%';
+            for(var j = 1; j < nestColors.length; j++) {
+              x = (j) * increment;
+              nestGradient = `${nestGradient}, ${nestColors[j]} ${x}%`;
+            }
+
+            //add the colors and borders as styles to the document head
+
+            colors = colors + `atom-text-editor::shadow ${selector}.${getthenbranchCssClass(node.name)} {
+              background: linear-gradient( 90deg, ${nestGradient}, ${thenbranchcolor} ${x+increment}%);
+            }
+            atom-text-editor::shadow  ${selector}.${getelsebranchCssClass(node.name)} {
+              background: linear-gradient( 90deg, ${nestGradient}, ${elsebranchcolor} ${x+increment}%);
+            }`
+          } else {
+            colors = colors + `atom-text-editor::shadow .${getthenbranchCssClass(node.name)} {
+              background-color: ${thenbranchcolor};
+            }
+            atom-text-editor::shadow .${getelsebranchCssClass(node.name)} {
+              background-color: ${elsebranchcolor};
+            }`
+          }
+
+          //recurse thenbranch and elsebranch
+          var lselector: Selector = {name: node.name, branch: "thenbranch"};
+          this.nesting.push({ selector: lselector, dimension: node});
+          //recurse on thenbranch and elsebranch
+          for(var i = 0; i < node.thenbranch.segments.length; i ++) {
+            colors = colors + this.setColors(node.thenbranch.segments[i]);
+          }
+          this.nesting.pop();
+
+          var rselector: Selector = {name: node.name, branch: "elsebranch"}
+          this.nesting.push({ selector: rselector, dimension: node});
+          for(var i = 0; i < node.elsebranch.segments.length; i ++) {
+            colors = colors + this.setColors(node.elsebranch.segments[i]);
+          }
+          this.nesting.pop();
+      }
+      return colors;
+  }
+
+  toggleDimensionEdit(dimension: DimensionUI, branch: Branch) {
+    var otherbranch;
+    if(branch === 'thenbranch') otherbranch = 'elsebranch';
+    else otherbranch = 'thenbranch';
+
+    //toggle off
+    if($(`#${dimension.name}-edit-${branch}`).hasClass('edit-enabled')) {
+      $(`#${dimension.name}-edit-${branch}`).removeClass('edit-enabled');
+      $(`#${dimension.name}-edit-${branch}`).addClass('edit-locked');
+      this.ui.removeActiveChoice(dimension.name, branch);
+    } else {
+      //toggle on
+      $(`#${dimension.name}-edit-${branch}`).addClass('edit-enabled');
+      $(`#${dimension.name}-edit-${branch}`).removeClass('edit-locked');
+
+
+      this.ui.updateActiveChoices(dimension.name, branch);
+    }
+    if($(`#${dimension.name}-edit-${otherbranch}`).hasClass('edit-enabled')) {
+      $(`#${dimension.name}-edit-${otherbranch}`).removeClass('edit-enabled');
+      $(`#${dimension.name}-edit-${otherbranch}`).addClass('edit-locked');
+
+      this.ui.removeActiveChoice(dimension.name, branch);
+    }
+  }
+
   updateSelections(selection: Selection) {
     for(let sel of this.selections) {
       if(sel.name === selection.name) {
@@ -471,32 +464,6 @@ class VJava {
 
     //if this is a dimension
     if(node.type === "choice") {
-        var found = false;
-        var selection: Selection;
-
-
-        for (var i = 0; i < this.selections.length; i ++) {
-          if (this.selections[i].name === node.name) {
-            found = true;
-            selection = this.selections[i];
-            break;
-          }
-        }
-
-
-        //next try the session color set
-        var sessionColor: string = this.ui.sessionColorFor(node.name);
-        //first try to use the color on the dimension
-        if(node.color) {
-          //if that exists, we're good
-        }
-        else if(sessionColor != 'none') {
-          node.color = sessionColor;
-        }
-        //lastly default to something ugly
-        else {
-          node.color = '#7a2525';
-        }
 
         //and this dimension has not yet been parsed
         if(!this.ui.hasDimension(node.name)) {
@@ -529,28 +496,16 @@ class VJava {
             });
 
 
+            //first try to use the color on the dimension
+            var uiColor: string = this.ui.getColorForNode(node);
 
-            var dimUIElement: DimensionUI = {
-              name: node.name,
-              color: node.color,
-              colorpicker: null
-            }
-            dimUIElement.colorpicker = $(`#${node.name}-colorpicker`).spectrum({
-              color: node.color
-            }).on('change', () => {
-              dimUIElement.color = dimUIElement.colorpicker.spectrum('get').toHexString();
-              this.updateDimensionColor(dimUIElement);
-            });
-
-            this.addViewListeners(dimUIElement);
-
-            //add this to the list of parsed dimensions, and generate a UI element for it
-            this.ui.dimensions.push(dimUIElement);
+            this.ui.setupColorPickerForDim(node.name, editor, this.addViewListeners, this.updateDimensionColor);
 
             //make choice selections if necessary
             //see if a  choice has been made in this dimension
             var choice = this.ui.getChoice(node.name);
 
+            var dimUIElement = this.ui.getDimUIElementByName(node.name);
             //if so, togchoicee the ui appropriately
             if(choice) { //this implies that a selection a
               this.toggleDimensionEdit(dimUIElement, choice.branch);
@@ -560,10 +515,17 @@ class VJava {
 
         if(isBranchActive(node, getSelectionForNode(node, this.selections), "thenbranch") && node.thenbranch.segments.length > 0 && !node.thenbranch.hidden) {
             //add markers for this new range of a (new or pre-existing) dimension
-            var thenbranchRange = editor.markBufferRange(this.getChoiceRange(node.thenbranch));
+            var thenbranchRange = editor.markBufferRange(node.thenbranch.span);
 
             //decorate with the appropriate css classes
             editor.decorateMarker(thenbranchRange, {type: 'line', class: getthenbranchCssClass(node.name)});
+
+            if(node.elsebranch.hidden) {
+              var element = document.createElement('div');
+              element.textContent = '(...)';
+              element.style.cssText = "float: left;";
+              editor.decorateMarker(thenbranchRange, {type: 'block', position: 'left', item: element});
+            }
 
             for(var i = this.nesting.length - 1; i >= 0; i --) {
               //nesting class format: 'nested-[DIM ID]-[BRANCH]-[LEVEL]'
@@ -580,7 +542,14 @@ class VJava {
 
         if(isBranchActive(node, getSelectionForNode(node, this.selections), "elsebranch") && node.elsebranch.segments.length > 0 && !node.thenbranch.hidden) {
 
-            var elsebranchRange = editor.markBufferRange(this.getChoiceRange(node.elsebranch));
+            var elsebranchRange = editor.markBufferRange(node.elsebranch.span);
+
+            if(node.thenbranch.hidden) {
+              var element = document.createElement('div');
+              element.textContent = '(...)';
+              element.style.cssText = "float: left;";
+              editor.decorateMarker(elsebranchRange, {type: 'block', position: 'left', item: element});
+            }
 
             editor.decorateMarker(elsebranchRange, {type: 'line', class: getelsebranchCssClass(node.name)});
             for(var i = this.nesting.length - 1; i >= 0; i --) {
@@ -647,39 +616,6 @@ class VJava {
     preserver.visitRegion(this.doc);
   }
 
-  adjustForReShow(editor: AtomCore.IEditor, dimension: string, branch: Branch) {
-    linesReAdded = 0;
-    for(var i = 0; i < this.doc.segments.length; i ++) {
-      this.adjustNode(this.doc.segments[i], editor, dimension, branch);
-    }
-  }
-
-  adjustNode(node: SegmentNode, editor: AtomCore.IEditor, dimension: string, branch: Branch) {
-    node.span.start[0] = node.span.start[0] + linesReAdded;
-    if(node.type === 'choice') {
-      if(node.name === dimension && branch === 'thenbranch') {
-        var choiceRange = this.getChoiceColumnRange(node.thenbranch);
-        var size = choiceRange[1]-choiceRange[0];
-        linesReAdded = linesReAdded + size + 1;
-      } else {
-        for(var i = 0; i < node.thenbranch.segments.length; i ++) {
-          this.adjustNode(node.thenbranch.segments[i], editor, dimension, branch);
-        }
-      }
-
-      if(node.name === dimension && branch === 'elsebranch') {
-        var choiceRange = this.getChoiceColumnRange(node.elsebranch);
-        var size = choiceRange[1]-choiceRange[0];
-        linesReAdded = linesReAdded + size + 1;
-      } else {
-        for(var i = 0; i < node.elsebranch.segments.length; i ++) {
-          this.adjustNode(node.elsebranch.segments[i], editor, dimension, branch);
-        }
-      }
-    }
-    node.span.end[0] = node.span.end[0] + linesReAdded;
-  }
-
   parseVJava(textContents: string, next: () => void) {
     const packagePath = atom.packages.resolvePackagePath("variational-java");
     const parserPath = path.resolve(packagePath, "lib", "variational-parser");
@@ -710,7 +646,6 @@ class VJava {
         this.selections[i].elsebranch = true;
       }
     }
-    this.adjustForReShow(editor, dimName, 'elsebranch');
     this.updateEditorText();
 
   }
@@ -733,8 +668,10 @@ class VJava {
     editor.setText(renderDocument(showDoc));
 
     for(var i = 0; i < this.doc.segments.length; i ++) {
-      this.renderDimensionUI(editor, this.doc.segments[i]);
+      this.renderDimensionUI(editor, showDoc.segments[i]);
     }
+
+    this.updateColors(showDoc);
   }
 
   // show the thenbranch alternative
@@ -746,7 +683,7 @@ class VJava {
         this.selections[i].thenbranch = true;
       }
     }
-    this.adjustForReShow(editor, dimName, 'thenbranch');
+
     this.updateEditorText();
   }
 
@@ -786,8 +723,6 @@ class VJava {
       this.createUI();
 
       this.updateEditorText();
-
-      this.updateColors();
 
       // Register command that toggles vjava view
       this.subscriptions.add(atom.commands.add('atom-workspace', {
@@ -846,11 +781,13 @@ class VJava {
     var node: ChoiceNode = {
       span: null, // we don't know what it's span will be
       name: dim,
-      color: this.ui.sessionColorFor(dim),
+      kind: null,
       type: 'choice',
       thenbranch: {segments: [], type: "region"},
       elsebranch: {segments: [], type: "region"}
     }
+    if(branch == "thenbranch") node.kind = "positive";
+    else node.kind = "contrapositive";
 
       node[branch].segments = [
         {
@@ -865,8 +802,6 @@ class VJava {
       var inserter = new NodeInserter(node, location, activeEditor);
       this.doc = inserter.rewriteDocument(this.doc);
       this.updateEditorText();
-
-      this.updateColors();
   }
 
   toggle() {
@@ -891,8 +826,6 @@ class VJava {
         this.createUI();
 
         this.updateEditorText();
-
-        this.updateColors();
 
         //preserve the contents for later comparison (put, get)
         this.raw = contents;
