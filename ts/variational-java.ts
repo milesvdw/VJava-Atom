@@ -392,12 +392,24 @@ class VJava {
             }
             atom-text-editor::shadow  ${selector}.${getelsebranchCssClass(node.name)} {
               background: linear-gradient( 90deg, ${nestGradient}, ${elsebranchcolor} ${x+increment}%);
+            }
+            .hover-alt.${selector}.${getthenbranchCssClass(node.name)} {
+              background: linear-gradient( 90deg, ${nestGradient}, ${thenbranchcolor} ${x+increment}%);
+            }
+            .hover-alt.${selector}.${getelsebranchCssClass(node.name)} {
+              background: linear-gradient( 90deg, ${nestGradient}, ${elsebranchcolor} ${x+increment}%);
             }`
           } else {
             colors = colors + `atom-text-editor::shadow .${getthenbranchCssClass(node.name)} {
               background-color: ${thenbranchcolor};
             }
             atom-text-editor::shadow .${getelsebranchCssClass(node.name)} {
+              background-color: ${elsebranchcolor};
+            }
+            .hover-alt.${getthenbranchCssClass(node.name)} {
+              background-color: ${thenbranchcolor};
+            }
+            .hover-alt.${getelsebranchCssClass(node.name)} {
               background-color: ${elsebranchcolor};
             }`
           }
@@ -499,7 +511,14 @@ class VJava {
             //first try to use the color on the dimension
             var uiColor: string = this.ui.getColorForNode(node);
 
-            this.ui.setupColorPickerForDim(node.name, editor, this.addViewListeners, this.updateDimensionColor);
+            var dimUIElement = this.ui.setupColorPickerForDim(node.name, editor);
+
+            dimUIElement.colorpicker.on('change', () => {
+              dimUIElement.color = dimUIElement.colorpicker.spectrum('get').toHexString();
+              this.updateDimensionColor(dimUIElement);
+            });
+
+            this.addViewListeners(dimUIElement);
 
             //make choice selections if necessary
             //see if a  choice has been made in this dimension
@@ -520,16 +539,22 @@ class VJava {
             //decorate with the appropriate css classes
             editor.decorateMarker(thenbranchRange, {type: 'line', class: getthenbranchCssClass(node.name)});
 
-            if(node.elsebranch.hidden) {
-              var element = document.createElement('div');
-              element.textContent = '(...)';
-              element.style.cssText = "float: left;";
-              editor.decorateMarker(thenbranchRange, {type: 'block', position: 'left', item: element});
-            }
+
+            var element = document.createElement('div');
 
             for(var i = this.nesting.length - 1; i >= 0; i --) {
               //nesting class format: 'nested-[DIM ID]-[BRANCH]-[LEVEL]'
-              editor.decorateMarker(thenbranchRange, {type: 'line', class: 'nested-' + this.nesting[i].selector.name + '-' + this.nesting[i].selector.branch + '-' + i});
+              var nestclass = 'nested-' + this.nesting[i].selector.name + '-' + this.nesting[i].selector.branch + '-' + i;
+              editor.decorateMarker(thenbranchRange, {type: 'line', class: nestclass});
+              element.classList.add(nestclass);
+            }
+
+            if(node.elsebranch.hidden) {
+              element.textContent = '(...)';
+              element.classList.add(`hover-alt-${node.name}`);
+              element.classList.add(`hover-alt`);
+              element.classList.add(getthenbranchCssClass(node.name));
+              editor.decorateMarker(thenbranchRange, {type: 'block', position: 'left', item: element});
             }
 
             this.nesting.push({ selector: {name: node.name, branch: "thenbranch"}, dimension: node});
@@ -540,22 +565,27 @@ class VJava {
             this.nesting.pop();
         }
 
-        if(isBranchActive(node, getSelectionForNode(node, this.selections), "elsebranch") && node.elsebranch.segments.length > 0 && !node.thenbranch.hidden) {
+        if(isBranchActive(node, getSelectionForNode(node, this.selections), "elsebranch") && node.elsebranch.segments.length > 0 && !node.elsebranch.hidden) {
 
             var elsebranchRange = editor.markBufferRange(node.elsebranch.span);
-
-            if(node.thenbranch.hidden) {
-              var element = document.createElement('div');
-              element.textContent = '(...)';
-              element.style.cssText = "float: left;";
-              editor.decorateMarker(elsebranchRange, {type: 'block', position: 'left', item: element});
-            }
+            var element = document.createElement('div');
 
             editor.decorateMarker(elsebranchRange, {type: 'line', class: getelsebranchCssClass(node.name)});
             for(var i = this.nesting.length - 1; i >= 0; i --) {
               //nesting class format: 'nested-[DIM ID]-[BRANCH]-[LEVEL]'
-              editor.decorateMarker(elsebranchRange, {type: 'line', class: 'nested-' + this.nesting[i].selector.name + '-' + this.nesting[i].selector.branch + '-' + i});
+              var nestclass = 'nested-' + this.nesting[i].selector.name + '-' + this.nesting[i].selector.branch + '-' + i;
+              editor.decorateMarker(elsebranchRange, {type: 'line', class: nestclass});
+              element.classList.add(nestclass);
             }
+
+            if(node.thenbranch.hidden) {
+              element.textContent = '(...)';
+              element.classList.add(`hover-alt-${node.name}`);
+              element.classList.add(`hover-alt`);
+              element.classList.add(getelsebranchCssClass(node.name));
+              editor.decorateMarker(elsebranchRange, {type: 'block', position: 'left', item: element});
+            }
+
 
             this.nesting.push({ selector: {name: node.name, branch: "elsebranch"}, dimension: node});
             for(var i = 0; i < node.elsebranch.segments.length; i ++) {

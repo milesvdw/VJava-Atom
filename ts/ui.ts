@@ -110,17 +110,13 @@ export class VJavaUI {
     return color;
   }
 
-  setupColorPickerForDim(dimName: string, editor: AtomCore.IEditor, addViewListeners: Function, updateDimensionColor: Function) : void {
+  setupColorPickerForDim(dimName: string, editor: AtomCore.IEditor) : DimensionUI {
     var dimUIElement;
     dimUIElement = this.getDimUIElementByName(dimName);
     dimUIElement.colorpicker = $(`#${dimName}-colorpicker`).spectrum({
       color: this.getColorForDim(dimName)
-    }).on('change', () => {
-      dimUIElement.color = dimUIElement.colorpicker.spectrum('get').toHexString();
-      updateDimensionColor(dimUIElement);
     });
-
-    addViewListeners(dimUIElement);
+    return dimUIElement;
 
   }
 
