@@ -539,11 +539,11 @@ class VJava {
 
             if (isBranchActive(node, getSelectionForNode(node, this.selections), "thenbranch") && node.thenbranch.segments.length > 0 && !node.thenbranch.hidden) {
                 //add markers for this new range of a (new or pre-existing) dimension
-                var thenbranchRange = editor.markBufferRange(node.thenbranch.span);
-                this.ui.markers.push(thenbranchRange);
+                var thenbranchMarker = editor.markBufferRange(node.thenbranch.span);
+                this.ui.markers.push(thenbranchMarker);
 
                 //decorate with the appropriate css classes
-                editor.decorateMarker(thenbranchRange, { type: 'line', class: getthenbranchCssClass(node.name) });
+                editor.decorateMarker(thenbranchMarker, { type: 'line', class: getthenbranchCssClass(node.name) });
 
 
                 var element = document.createElement('div');
@@ -551,7 +551,7 @@ class VJava {
                 for (var i = this.nesting.length - 1; i >= 0; i--) {
                     //nesting class format: 'nested-[DIM ID]-[BRANCH]-[LEVEL]'
                     var nestclass = 'nested-' + this.nesting[i].selector.name + '-' + this.nesting[i].selector.branch + '-' + i;
-                    editor.decorateMarker(thenbranchRange, { type: 'line', class: nestclass });
+                    editor.decorateMarker(thenbranchMarker, { type: 'line', class: nestclass });
                     element.classList.add(nestclass);
                 }
 
@@ -560,7 +560,7 @@ class VJava {
                     element.classList.add(`hover-alt-${node.name}`);
                     element.classList.add(`hover-alt`);
                     element.classList.add(getelsebranchCssClass(node.name));
-                    editor.decorateMarker(thenbranchRange, { type: 'block', position: 'left', item: element });
+                    editor.decorateMarker(thenbranchMarker, { type: 'block', position: 'left', item: element });
                 }
 
                 this.nesting.push({ selector: { name: node.name, branch: "thenbranch" }, dimension: node });
@@ -573,14 +573,14 @@ class VJava {
 
             if (isBranchActive(node, getSelectionForNode(node, this.selections), "elsebranch") && node.elsebranch.segments.length > 0 && !node.elsebranch.hidden) {
 
-                var elsebranchRange = editor.markBufferRange(node.elsebranch.span);
-                this.ui.markers.push(elsebranchRange);
+                var elsebranchMarker = editor.markBufferRange(node.elsebranch.span);
+                this.ui.markers.push(elsebranchMarker);
 
-                editor.decorateMarker(elsebranchRange, { type: 'line', class: getelsebranchCssClass(node.name) });
+                editor.decorateMarker(elsebranchMarker, { type: 'line', class: getelsebranchCssClass(node.name) });
                 for (var i = this.nesting.length - 1; i >= 0; i--) {
                     //nesting class format: 'nested-[DIM ID]-[BRANCH]-[LEVEL]'
                     var nestclass = 'nested-' + this.nesting[i].selector.name + '-' + this.nesting[i].selector.branch + '-' + i;
-                    editor.decorateMarker(elsebranchRange, { type: 'line', class: nestclass });
+                    editor.decorateMarker(elsebranchMarker, { type: 'line', class: nestclass });
                     element.classList.add(nestclass);
                 }
 
@@ -591,7 +591,7 @@ class VJava {
                     element.classList.add(`hover-alt-${node.name}`);
                     element.classList.add(`hover-alt`);
                     element.classList.add(getthenbranchCssClass(node.name));
-                    editor.decorateMarker(elsebranchRange, { type: 'block', position: 'before', item: element });
+                    editor.decorateMarker(elsebranchMarker, { type: 'block', position: 'before', item: element });
                 }
 
 
