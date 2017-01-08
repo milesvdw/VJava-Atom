@@ -652,12 +652,15 @@ class VJava {
 
     const parserProcess = spawn(parserPath, [], { cwd: packagePath });
     parserProcess.stdout.setEncoding('utf8');
-    parserProcess.stdout.on('data', (data) => {
-      this.doc = JSON.parse(data.toString());
-      next();
+
+    let data = '';
+    parserProcess.stdout.on('data', (chunk) => {
+      data += chunk.toString();
     });
     parserProcess.on('exit', (code) => {
       console.log('child process exited with code ' + code);
+      this.doc = JSON.parse(data);
+      next();
     });
 
     parserProcess.stdin.write(textContents);
