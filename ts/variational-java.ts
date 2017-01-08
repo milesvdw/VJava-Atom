@@ -127,6 +127,7 @@ class VJava {
         this.ui.main = $(`#${mainDivId}`);
         this.ui.secondary = $(`#${secondaryDivId}`);
         this.ui.message = this.ui.main.find("#message");
+        this.ui.markers = [];
 
         // consider css :hover for this...
         $("#addNewDimension").on('mouseover', () => {
@@ -539,6 +540,7 @@ class VJava {
             if (isBranchActive(node, getSelectionForNode(node, this.selections), "thenbranch") && node.thenbranch.segments.length > 0 && !node.thenbranch.hidden) {
                 //add markers for this new range of a (new or pre-existing) dimension
                 var thenbranchRange = editor.markBufferRange(node.thenbranch.span);
+                this.ui.markers.push(thenbranchRange);
 
                 //decorate with the appropriate css classes
                 editor.decorateMarker(thenbranchRange, { type: 'line', class: getthenbranchCssClass(node.name) });
@@ -557,7 +559,7 @@ class VJava {
                     element.textContent = '(...)';
                     element.classList.add(`hover-alt-${node.name}`);
                     element.classList.add(`hover-alt`);
-                    element.classList.add(getthenbranchCssClass(node.name));
+                    element.classList.add(getelsebranchCssClass(node.name));
                     editor.decorateMarker(thenbranchRange, { type: 'block', position: 'left', item: element });
                 }
 
@@ -572,7 +574,7 @@ class VJava {
             if (isBranchActive(node, getSelectionForNode(node, this.selections), "elsebranch") && node.elsebranch.segments.length > 0 && !node.elsebranch.hidden) {
 
                 var elsebranchRange = editor.markBufferRange(node.elsebranch.span);
-                var element = document.createElement('div');
+                this.ui.markers.push(elsebranchRange);
 
                 editor.decorateMarker(elsebranchRange, { type: 'line', class: getelsebranchCssClass(node.name) });
                 for (var i = this.nesting.length - 1; i >= 0; i--) {
@@ -582,12 +584,14 @@ class VJava {
                     element.classList.add(nestclass);
                 }
 
+                var element = document.createElement('div');
+
                 if (node.thenbranch.hidden) {
                     element.textContent = '(...)';
                     element.classList.add(`hover-alt-${node.name}`);
                     element.classList.add(`hover-alt`);
-                    element.classList.add(getelsebranchCssClass(node.name));
-                    editor.decorateMarker(elsebranchRange, { type: 'block', position: 'left', item: element });
+                    element.classList.add(getthenbranchCssClass(node.name));
+                    editor.decorateMarker(elsebranchRange, { type: 'block', position: 'before', item: element });
                 }
 
 
@@ -703,6 +707,11 @@ class VJava {
         var editor = atom.workspace.getActiveTextEditor();
         var showDoc = new ViewRewriter(this.selections).rewriteDocument(this.doc);
         editor.setText(renderDocument(showDoc));
+
+        for(var marker of this.ui.markers) {
+            marker.destroy();
+        }
+        this.ui.markers = [];
 
         for (var i = 0; i < this.doc.segments.length; i++) {
             this.renderDimensionUI(editor, showDoc.segments[i]);

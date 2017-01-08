@@ -25,7 +25,7 @@ int dummy() {
 2
 3
 4
-#ifdef BIG
+#ifndef BIG
 new dimension
 #endif
 6

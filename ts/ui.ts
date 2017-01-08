@@ -28,6 +28,7 @@ export class VJavaUI {
     message: JQuery;
     dimensions: DimensionUI[];
     activeChoices: Selector[];
+    markers: AtomCore.IDisplayBufferMarker[];
 
     hasDimension(name: string): boolean {
         for (let dim of this.dimensions) {
