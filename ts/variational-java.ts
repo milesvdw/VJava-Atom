@@ -1,4 +1,4 @@
-'use babel';
+  'use babel';
 
 declare module 'atom' {
     class CompositeDisposable {
@@ -560,7 +560,9 @@ class VJava {
                     element.classList.add(`hover-alt-${node.name}`);
                     element.classList.add(`hover-alt`);
                     element.classList.add(getelsebranchCssClass(node.name));
-                    editor.decorateMarker(thenbranchMarker, { type: 'block', position: 'left', item: element });
+                    var elseHiddenMarker = editor.markBufferPosition(node.thenbranch.span.end);
+                    this.ui.markers.push(elseHiddenMarker);
+                    editor.decorateMarker(elseHiddenMarker, { type: 'block', position: 'before', item: element });
                 }
 
                 this.nesting.push({ selector: { name: node.name, branch: "thenbranch" }, dimension: node });
@@ -591,7 +593,9 @@ class VJava {
                     element.classList.add(`hover-alt-${node.name}`);
                     element.classList.add(`hover-alt`);
                     element.classList.add(getthenbranchCssClass(node.name));
-                    editor.decorateMarker(elsebranchMarker, { type: 'block', position: 'before', item: element });
+                    var thenHiddenMarker = editor.markBufferPosition(node.elsebranch.span.start);
+                    this.ui.markers.push(thenHiddenMarker);
+                    editor.decorateMarker(thenHiddenMarker, { type: 'block', position: 'before', item: element });
                 }
 
 
