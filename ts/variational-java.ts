@@ -115,6 +115,7 @@ class VJava {
     dimensionColors: {}
     activeChoices: Selector[] // in the form of dimensionId:thenbranch|elsebranch
     subscriptions: CompositeDisposable
+    tooltips: CompositeDisposable
 
     // initialize the user interface
     // TODO: make this a function that returns an object conforming to VJavaUI
@@ -723,12 +724,14 @@ class VJava {
         }
         this.ui.markers = [];
 
+        this.tooltips.dispose();
+
         for (var i = 0; i < this.doc.segments.length; i++) {
             this.renderDimensionUI(editor, showDoc.segments[i]);
         }
 
         for(var popup of this.popupListenerQueue) {
-            popup.element.addEventListener('mouseover', () => {alert(popup.text)});
+            this.tooltips.add(atom.tooltips.add(popup.element, {title: popup.text}));
         }
         this.popupListenerQueue = [];
 
@@ -768,6 +771,7 @@ class VJava {
         this.nesting = [];
         this.ui.activeChoices = [];
         this.popupListenerQueue = [];
+        this.tooltips = new CompositeDisposable();
 
         this.selections = !$.isEmptyObject({}) ? state : [];
 
