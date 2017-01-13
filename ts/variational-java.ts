@@ -110,6 +110,7 @@ class VJava {
     ui: VJavaUI
     doc: RegionNode
     raw: string
+    popupListenerQueue: { element : HTMLElement, text: string }[]
     colorpicker: {}
     dimensionColors: {}
     activeChoices: Selector[] // in the form of dimensionId:thenbranch|elsebranch
@@ -392,10 +393,10 @@ class VJava {
 
                 //add the colors and borders as styles to the document head
 
-                colors = colors + `atom-text-editor::shadow ${selector}.${getthenbranchCssClass(node.name)} {
+                colors = colors + `${selector}.${getthenbranchCssClass(node.name)} {
               background: linear-gradient( 90deg, ${nestGradient}, ${thenbranchcolor} ${x + increment}%);
             }
-            atom-text-editor::shadow  ${selector}.${getelsebranchCssClass(node.name)} {
+             ${selector}.${getelsebranchCssClass(node.name)} {
               background: linear-gradient( 90deg, ${nestGradient}, ${elsebranchcolor} ${x + increment}%);
             }
             .hover-alt.${selector}.${getthenbranchCssClass(node.name)} {
@@ -405,10 +406,10 @@ class VJava {
               background: linear-gradient( 90deg, ${nestGradient}, ${elsebranchcolor} ${x + increment}%);
             }`
             } else {
-                colors = colors + `atom-text-editor::shadow .${getthenbranchCssClass(node.name)} {
+                colors = colors + `.${getthenbranchCssClass(node.name)} {
               background-color: ${thenbranchcolor};
             }
-            atom-text-editor::shadow .${getelsebranchCssClass(node.name)} {
+            .${getelsebranchCssClass(node.name)} {
               background-color: ${elsebranchcolor};
             }
             .hover-alt.${getthenbranchCssClass(node.name)} {
@@ -560,6 +561,8 @@ class VJava {
                     element.classList.add(`hover-alt-${node.name}`);
                     element.classList.add(`hover-alt`);
                     element.classList.add(getelsebranchCssClass(node.name));
+                    this.popupListenerQueue.push({element: element, text: renderDocument(node.elsebranch) });
+
                     var elseHiddenMarker = editor.markBufferPosition(node.thenbranch.span.end);
                     this.ui.markers.push(elseHiddenMarker);
                     editor.decorateMarker(elseHiddenMarker, { type: 'block', position: 'before', item: element });
@@ -593,6 +596,9 @@ class VJava {
                     element.classList.add(`hover-alt-${node.name}`);
                     element.classList.add(`hover-alt`);
                     element.classList.add(getthenbranchCssClass(node.name));
+
+                    this.popupListenerQueue.push({element: element, text: renderDocument(node.thenbranch) });
+
                     var thenHiddenMarker = editor.markBufferPosition(node.elsebranch.span.start);
                     this.ui.markers.push(thenHiddenMarker);
                     editor.decorateMarker(thenHiddenMarker, { type: 'block', position: 'before', item: element });
@@ -721,6 +727,11 @@ class VJava {
             this.renderDimensionUI(editor, showDoc.segments[i]);
         }
 
+        for(var popup of this.popupListenerQueue) {
+            popup.element.addEventListener('mouseover', () => {alert(popup.text)});
+        }
+        this.popupListenerQueue = [];
+
         this.updateColors(showDoc);
     }
 
@@ -756,6 +767,7 @@ class VJava {
         this.ui.session = [];
         this.nesting = [];
         this.ui.activeChoices = [];
+        this.popupListenerQueue = [];
 
         this.selections = !$.isEmptyObject({}) ? state : [];
 
