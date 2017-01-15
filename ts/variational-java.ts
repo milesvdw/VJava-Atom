@@ -3,6 +3,7 @@
 declare module 'atom' {
     class CompositeDisposable {
         add(command: any): void;
+        dispose(): void;
     }
 }
 
@@ -26,6 +27,10 @@ declare global {
         last(): T | undefined;
     }
     namespace AtomCore {
+        interface IAtom {
+            tooltips: any;
+        }
+
         interface IEditor {
             getTextInBufferRange(span: Span): string;
             getTextInBufferRange(span: number[][]): string;
@@ -39,6 +44,10 @@ declare global {
     interface JQuery {
         spectrum({color});
         spectrum(method: string);
+    }
+
+    interface CompositeDisposable {
+        destroy();
     }
 }
 
