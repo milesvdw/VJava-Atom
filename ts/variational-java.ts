@@ -356,10 +356,14 @@ class VJava {
             //find the color for the thenbranch alternative
             if (node.kind === 'positive') {
                 var thenbranchcolor = shadeColor(color, .1);
+                var thenbranchhighlightcolor = shadeColor(color, .15);
                 var elsebranchcolor = shadeColor(color, -.1);
+                var elsebranchhighlightcolor = shadeColor(color, -.05);
             } else {
+                var thenbranchhighlightcolor = shadeColor(color, -.05);
                 var thenbranchcolor = shadeColor(color, -.1);
                 var elsebranchcolor = shadeColor(color, .1);
+                var elsebranchhighlightcolor = shadeColor(color, .15);
             }
 
             var selectors = [];
@@ -397,8 +401,14 @@ class VJava {
                 colors = colors + `${selector}.${getthenbranchCssClass(node.name)} {
               background: linear-gradient( 90deg, ${nestGradient}, ${thenbranchcolor} ${x + increment}%);
             }
+            ${selector}.${getthenbranchCssClass(node.name)}.cursor-line {
+              background: linear-gradient( 90deg, ${nestGradient}, ${thenbranchhighlightcolor} ${x + increment}%);
+            }
              ${selector}.${getelsebranchCssClass(node.name)} {
               background: linear-gradient( 90deg, ${nestGradient}, ${elsebranchcolor} ${x + increment}%);
+            }
+            ${selector}.${getelsebranchCssClass(node.name)}.cursor-line {
+              background: linear-gradient( 90deg, ${nestGradient}, ${elsebranchhighlightcolor} ${x + increment}%);
             }
             .hover-alt.${selector}.${getthenbranchCssClass(node.name)} {
               background: linear-gradient( 90deg, ${nestGradient}, ${thenbranchcolor} ${x + increment}%);
@@ -410,8 +420,14 @@ class VJava {
                 colors = colors + `.${getthenbranchCssClass(node.name)} {
               background-color: ${thenbranchcolor};
             }
+            .${getthenbranchCssClass(node.name)}.cursor-line {
+              background-color: ${thenbranchhighlightcolor};
+            }
             .${getelsebranchCssClass(node.name)} {
               background-color: ${elsebranchcolor};
+            }
+            .${getelsebranchCssClass(node.name)}.cursor-line {
+              background-color: ${elsebranchhighlightcolor};
             }
             .hover-alt.${getthenbranchCssClass(node.name)} {
               background-color: ${thenbranchcolor};
