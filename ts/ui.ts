@@ -82,8 +82,8 @@ export class VJavaUI {
                 this.dimensions.push({ name: node.name, color: sessionColor, colorpicker: null })
                 color = sessionColor;
             } else {
-                this.dimensions.push({ name: node.name, color: '#7a2525', colorpicker: null })
-                color = '#7z2525';
+                this.dimensions.push({ name: node.name, color: 'rgb(127, 71, 62)', colorpicker: null })
+                color = 'rgb(127, 71, 62)';
             }
         }
         return color;
@@ -104,8 +104,8 @@ export class VJavaUI {
                 this.dimensions.push({ name: dimName, color: sessionColor, colorpicker: null })
                 color = sessionColor;
             } else {
-                this.dimensions.push({ name: dimName, color: '#7a2525', colorpicker: null })
-                color = '#7z2525';
+                this.dimensions.push({ name: dimName, color: '#6ea6ab', colorpicker: null })
+                color = 'rgb(127, 71, 62)';
             }
         }
         return color;
@@ -115,7 +115,8 @@ export class VJavaUI {
         var dimUIElement;
         dimUIElement = this.getDimUIElementByName(dimName);
         dimUIElement.colorpicker = $(`#${dimName}-colorpicker`).spectrum({
-            color: this.getColorForDim(dimName)
+            color: this.getColorForDim(dimName),
+            preferredFormat: 'rgb'
         });
         return dimUIElement;
 

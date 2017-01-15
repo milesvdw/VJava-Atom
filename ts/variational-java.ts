@@ -74,25 +74,16 @@ function rangeToSpan(range): Span {
 var linesRemoved = 0;
 var linesReAdded = 0;
 
-function shadeColor(hex: string, lum?: number) {
-
-    // validate hex string
-    hex = String(hex).replace(/[^0-9a-f]/gi, '');
-    if (hex.length < 6) {
-        hex = hex[0] + hex[0] + hex[1] + hex[1] + hex[2] + hex[2];
-    }
+function shadeColor(rgb: string, lum?: number) {
 
     lum = lum || 0;
+    lum = lum + 1;
 
     // convert to decimal and change luminosity
-    var rgb = "#", c, i;
-    for (i = 0; i < 3; i++) {
-        c = parseInt(hex.substr(i * 2, 2), 16);
-        c = Math.round(Math.min(Math.max(0, c + (c * lum)), 255)).toString(16);
-        rgb += ("00" + c).substr(c.length);
-    }
+    var parens = rgb.split('(');
+    var nums = parens[1].replace(' ', '').split(',');
 
-    return rgb;
+    return `rgba(${Math.floor(parseInt(nums[0], 10) * lum)}, ${Math.floor(parseInt(nums[1], 10) * lum)}, ${Math.floor(parseInt(nums[2], 10) * lum)}, .3)`;
 }
 
 // the heck is this state doing here?
@@ -148,7 +139,7 @@ class VJava {
 
             var dimension: DimensionUI = {
                 name: dimName,
-                color: '#7a2525'
+                color: 'rgb(127, 71, 62)'
             };
 
             // goddamn, dude
@@ -198,7 +189,8 @@ class VJava {
 
 
                 dimension.colorpicker = $(document.getElementById(dimension.name + '-colorpicker')).spectrum({
-                    color: dimension.color
+                    color: dimension.color,
+                    preferredFormat: 'rgb'
                 }).on('change', () => {
                     dimension.color = dimension.colorpicker.spectrum('get').toHexString();
                     this.updateDimensionColor(dimension);
@@ -365,14 +357,18 @@ class VJava {
             //find the color for the thenbranch alternative
             if (node.kind === 'positive') {
                 var thenbranchcolor = shadeColor(color, .1);
-                var thenbranchhighlightcolor = shadeColor(color, .15);
+                var thenbranchcursorcolor = shadeColor(color, .15);
+                var thenbranchhighlightcolor = shadeColor(color, .35);
                 var elsebranchcolor = shadeColor(color, -.1);
-                var elsebranchhighlightcolor = shadeColor(color, -.05);
+                var elsebranchcursorcolor = shadeColor(color, -.05);
+                var elsebranchhighlightcolor = shadeColor(color, -.15);
             } else {
-                var thenbranchhighlightcolor = shadeColor(color, -.05);
+                var thenbranchcursorcolor = shadeColor(color, -.05);
+                var thenbranchhighlightcolor = shadeColor(color, .15);
                 var thenbranchcolor = shadeColor(color, -.1);
                 var elsebranchcolor = shadeColor(color, .1);
-                var elsebranchhighlightcolor = shadeColor(color, .15);
+                var elsebranchcursorcolor = shadeColor(color, .15);
+                var elsebranchhighlightcolor = shadeColor(color, .35);
             }
 
             var selectors = [];
@@ -408,18 +404,19 @@ class VJava {
                 //add the colors and borders as styles to our master list
 
                 this.styles[`${selector}.${getthenbranchCssClass(node.name)}`] = `background: linear-gradient( 90deg, ${nestGradient}, ${thenbranchcolor} ${x + increment}%);`;
-                this.styles[`${selector}.${getthenbranchCssClass(node.name)}.cursor-line`] = `background: linear-gradient( 90deg, ${nestGradient}, ${thenbranchhighlightcolor} ${x + increment}%);`;
+                this.styles[`${selector}.${getthenbranchCssClass(node.name)}.cursor-line`] = `background: linear-gradient( 90deg, ${nestGradient}, ${thenbranchcursorcolor} ${x + increment}%);`;
                 this.styles[`${selector}.${getelsebranchCssClass(node.name)}`] = `background: linear-gradient( 90deg, ${nestGradient}, ${elsebranchcolor} ${x + increment}%);`;
-                this.styles[`${selector}.${getelsebranchCssClass(node.name)}.cursor-line`] = `background: linear-gradient( 90deg, ${nestGradient}, ${elsebranchhighlightcolor} ${x + increment}%);`;
+                this.styles[`${selector}.${getelsebranchCssClass(node.name)}.cursor-line`] = `background: linear-gradient( 90deg, ${nestGradient}, ${elsebranchcursorcolor} ${x + increment}%);`;
                 this.styles[`.hover-alt.${selector}.${getthenbranchCssClass(node.name)}`] = `background: linear-gradient( 90deg, ${nestGradient}, ${thenbranchcolor} ${x + increment}%);`;
                 this.styles[`.hover-alt.${selector}.${getelsebranchCssClass(node.name)}`] = `background: linear-gradient( 90deg, ${nestGradient}, ${elsebranchcolor} ${x + increment}%);`;
 
             } else {
-
                 this.styles[`.${getthenbranchCssClass(node.name)}`] = `background-color: ${thenbranchcolor};`;
                 this.styles[`.${getelsebranchCssClass(node.name)}`] = `background-color: ${elsebranchcolor};`;
-                this.styles[`.${getthenbranchCssClass(node.name)}.cursor-line.line`] = `background-color: ${thenbranchhighlightcolor};`;
-                this.styles[`.${getelsebranchCssClass(node.name)}.cursor-line.line`] = ` background-color: ${elsebranchhighlightcolor};`;
+                this.styles[`.${getthenbranchCssClass(node.name)}.cursor-line.line`] = `background-color: ${thenbranchcursorcolor};`;
+                this.styles[`.${getelsebranchCssClass(node.name)}.cursor-line.line`] = ` background-color: ${elsebranchcursorcolor};`;
+                this.styles[`.${getthenbranchCssClass(node.name)}.line`] = `background-color: ${thenbranchhighlightcolor};`;
+                this.styles[`.${getelsebranchCssClass(node.name)}.highlight.line`] = ` background-color: ${elsebranchhighlightcolor};`;
                 this.styles[`.hover-alt.${getthenbranchCssClass(node.name)}`] = `background-color: ${thenbranchcolor};`;
                 this.styles[`.hover-alt.${getelsebranchCssClass(node.name)}`] = `background-color: ${elsebranchcolor};`;
             }
@@ -523,7 +520,9 @@ class VJava {
                 var dimUIElement = this.ui.setupColorPickerForDim(node.name, editor);
 
                 dimUIElement.colorpicker.on('change', () => {
-                    dimUIElement.color = dimUIElement.colorpicker.spectrum('get').toHexString();
+                    var rgba = dimUIElement.colorpicker.spectrum('get').toRgbString();
+                    dimUIElement.color = rgba;
+
                     this.updateDimensionColor(dimUIElement);
                 });
 
