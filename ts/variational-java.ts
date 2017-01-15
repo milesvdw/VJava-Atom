@@ -105,6 +105,7 @@ var iconsPath = atom.packages.resolvePackagePath("variational-java") + "/icons";
 
 class VJava {
 
+    styles: {[selector : string] : string} = {}
     nesting: NestLevel[] // a stack represented nested dimensions
     selections: Selection[]
     ui: VJavaUI
@@ -335,21 +336,29 @@ class VJava {
     }
 
     clearColors() {
-        $("#ifdef-color-styles").remove();
+        $("#dimension-color-styles").remove();
+        this.styles = {}
+    }
+
+    serializeColors() : string {
+        var css = '';
+        for(var selector in this.styles) {
+            css += selector + ` { ${this.styles[selector]}} \n`;
+        }
+        return css;
     }
 
     updateColors(doc: RegionNode) {
         this.clearColors();
-        var colors = '';
         for (var i = 0; i < doc.segments.length; i++) {
-            colors = colors + this.setColors(doc.segments[i]);
+            this.setColors(doc.segments[i]);
         }
-        $('head').append(`<style id='dimension-color-styles'>${colors}</style>`);
+        var css = this.serializeColors();
+        $('head').append(`<style id='dimension-color-styles'>${css}</style>`);
     }
 
-    setColors(node: SegmentNode) {
+    setColors(node: SegmentNode) : void {
         //if this is a dimension
-        var colors = '';
         if (node.type === 'choice') {
             var color = this.ui.getColorForNode(node);
 
@@ -396,45 +405,23 @@ class VJava {
                     nestGradient = `${nestGradient}, ${nestColors[j]} ${x}%`;
                 }
 
-                //add the colors and borders as styles to the document head
+                //add the colors and borders as styles to our master list
 
-                colors = colors + `${selector}.${getthenbranchCssClass(node.name)} {
-              background: linear-gradient( 90deg, ${nestGradient}, ${thenbranchcolor} ${x + increment}%);
-            }
-            ${selector}.${getthenbranchCssClass(node.name)}.cursor-line {
-              background: linear-gradient( 90deg, ${nestGradient}, ${thenbranchhighlightcolor} ${x + increment}%);
-            }
-             ${selector}.${getelsebranchCssClass(node.name)} {
-              background: linear-gradient( 90deg, ${nestGradient}, ${elsebranchcolor} ${x + increment}%);
-            }
-            ${selector}.${getelsebranchCssClass(node.name)}.cursor-line {
-              background: linear-gradient( 90deg, ${nestGradient}, ${elsebranchhighlightcolor} ${x + increment}%);
-            }
-            .hover-alt.${selector}.${getthenbranchCssClass(node.name)} {
-              background: linear-gradient( 90deg, ${nestGradient}, ${thenbranchcolor} ${x + increment}%);
-            }
-            .hover-alt.${selector}.${getelsebranchCssClass(node.name)} {
-              background: linear-gradient( 90deg, ${nestGradient}, ${elsebranchcolor} ${x + increment}%);
-            }`
+                this.styles[`${selector}.${getthenbranchCssClass(node.name)}`] = `background: linear-gradient( 90deg, ${nestGradient}, ${thenbranchcolor} ${x + increment}%);`;
+                this.styles[`${selector}.${getthenbranchCssClass(node.name)}.cursor-line`] = `background: linear-gradient( 90deg, ${nestGradient}, ${thenbranchhighlightcolor} ${x + increment}%);`;
+                this.styles[`${selector}.${getelsebranchCssClass(node.name)}`] = `background: linear-gradient( 90deg, ${nestGradient}, ${elsebranchcolor} ${x + increment}%);`;
+                this.styles[`${selector}.${getelsebranchCssClass(node.name)}.cursor-line`] = `background: linear-gradient( 90deg, ${nestGradient}, ${elsebranchhighlightcolor} ${x + increment}%);`;
+                this.styles[`.hover-alt.${selector}.${getthenbranchCssClass(node.name)}`] = `background: linear-gradient( 90deg, ${nestGradient}, ${thenbranchcolor} ${x + increment}%);`;
+                this.styles[`.hover-alt.${selector}.${getelsebranchCssClass(node.name)}`] = `background: linear-gradient( 90deg, ${nestGradient}, ${elsebranchcolor} ${x + increment}%);`;
+
             } else {
-                colors = colors + `.${getthenbranchCssClass(node.name)} {
-              background-color: ${thenbranchcolor};
-            }
-            .${getthenbranchCssClass(node.name)}.cursor-line {
-              background-color: ${thenbranchhighlightcolor};
-            }
-            .${getelsebranchCssClass(node.name)} {
-              background-color: ${elsebranchcolor};
-            }
-            .${getelsebranchCssClass(node.name)}.cursor-line {
-              background-color: ${elsebranchhighlightcolor};
-            }
-            .hover-alt.${getthenbranchCssClass(node.name)} {
-              background-color: ${thenbranchcolor};
-            }
-            .hover-alt.${getelsebranchCssClass(node.name)} {
-              background-color: ${elsebranchcolor};
-            }`
+
+                this.styles[`.${getthenbranchCssClass(node.name)}`] = `background-color: ${thenbranchcolor};`;
+                this.styles[`.${getelsebranchCssClass(node.name)}`] = `background-color: ${elsebranchcolor};`;
+                this.styles[`.${getthenbranchCssClass(node.name)}.cursor-line.line`] = `background-color: ${thenbranchhighlightcolor};`;
+                this.styles[`.${getelsebranchCssClass(node.name)}.cursor-line.line`] = ` background-color: ${elsebranchhighlightcolor};`;
+                this.styles[`.hover-alt.${getthenbranchCssClass(node.name)}`] = `background-color: ${thenbranchcolor};`;
+                this.styles[`.hover-alt.${getelsebranchCssClass(node.name)}`] = `background-color: ${elsebranchcolor};`;
             }
 
             //recurse thenbranch and elsebranch
@@ -442,18 +429,17 @@ class VJava {
             this.nesting.push({ selector: lselector, dimension: node });
             //recurse on thenbranch and elsebranch
             for (var i = 0; i < node.thenbranch.segments.length; i++) {
-                colors = colors + this.setColors(node.thenbranch.segments[i]);
+                this.setColors(node.thenbranch.segments[i]);
             }
             this.nesting.pop();
 
             var rselector: Selector = { name: node.name, branch: "elsebranch" }
             this.nesting.push({ selector: rselector, dimension: node });
             for (var i = 0; i < node.elsebranch.segments.length; i++) {
-                colors = colors + this.setColors(node.elsebranch.segments[i]);
+                this.setColors(node.elsebranch.segments[i]);
             }
             this.nesting.pop();
         }
-        return colors;
     }
 
     toggleDimensionEdit(dimension: DimensionUI, branch: Branch) {
