@@ -22,13 +22,27 @@ export type Branch = "thenbranch" | "elsebranch";
 
 export class VJavaUI {
     panel: AtomCore.Panel;
-    main: JQuery;
     session: DimensionUI[];
+    dimensions: DimensionUI[];
+    main: JQuery;
     secondary: JQuery;
     message: JQuery;
-    dimensions: DimensionUI[];
     activeChoices: Selector[];
     markers: AtomCore.IDisplayBufferMarker[];
+
+
+    constructor({panel = null, session = [], dimensions = [], activeChoices = [], markers = []}) {
+                  this.panel = panel;
+                  this.session = session;
+                  this.dimensions = dimensions; //TODO do we really need a session and a list of dimensions? are they the same?
+                  this.activeChoices = activeChoices;
+                  this.markers = markers;
+    }
+
+    serialize() {
+        return {data: {panel: this.panel, session: this.session, dimensions: this.dimensions,
+                activeChoices: this.activeChoices, markers: this.markers}, deserializer: "VJavaUI"};
+    }
 
     hasDimension(name: string): boolean {
         for (let dim of this.dimensions) {

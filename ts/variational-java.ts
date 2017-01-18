@@ -183,10 +183,10 @@ class VJava {
             <br>
             <span class='edit edit-enabled' id='${dimName}-edit-thenbranch'>&#9998;</span>
             <span class='view view-enabled' id='${dimName}-view-thenbranch'>&#128065;</span>
-                <span class='choice-label' id='${dimName}-thenbranch-text'>thenbranch</span><br>
+                <span class='choice-label' id='${dimName}-thenbranch-text'>defined</span><br>
             <span class='edit edit-enabled' id='${dimName}-edit-elsebranch'>&#9998;</span>
             <span class='view view-enabled' id='${dimName}-view-elsebranch'>&#128065;</span>
-                <span class='choice-label' id='${dimName}-elsebranch-text'>elsebranch</span><br></div>`);
+                <span class='choice-label' id='${dimName}-elsebranch-text'>undefined</span><br></div>`);
                 this.ui.main.append(dimDiv);
 
 
@@ -508,13 +508,13 @@ class VJava {
               <span class='edit edit-enabled' id='${node.name}-edit-thenbranch' style='display: none;'>&#9998;</span>
               <span class='view view-enabled' id='${node.name}-view-thenbranch'>&#128065;</span>
               </span>
-              <span class='choice-label' id='${node.name}-thenbranch-text'>thenbranch</span><br>
+              <span class='choice-label' id='${node.name}-thenbranch-text'>defined</span><br>
               <span class='toggle-elsebranch'>
               <span class='edit' id='${node.name}-disable-elsebranch' style='display: none;'>&nbsp;&nbsp;&nbsp;</span>
               <span class='edit edit-enabled' id='${node.name}-edit-elsebranch' style='display: none;'>&#9998;</span>
               <span class='view view-enabled' id='${node.name}-view-elsebranch'>&#128065;</span>
               </span>
-              <span class='choice-label' id='${node.name}-elsebranch-text'>elsebranch</span><br></div>  `);
+              <span class='choice-label' id='${node.name}-elsebranch-text'>undefined</span><br></div>  `);
                 this.ui.main.append(dimDiv);
 
                 //only hook up listeners, etc. once!
@@ -551,7 +551,7 @@ class VJava {
 
             if (isBranchActive(node, getSelectionForNode(node, this.selections), "thenbranch") && node.thenbranch.segments.length > 0 && !node.thenbranch.hidden) {
                 //add markers for this new range of a (new or pre-existing) dimension
-                var thenbranchMarker = editor.markBufferRange(node.thenbranch.span);
+                var thenbranchMarker = editor.markBufferRange(node.thenbranch.span, {invalidate: 'surround'});
                 this.ui.markers.push(thenbranchMarker);
 
                 //decorate with the appropriate css classes
@@ -589,7 +589,7 @@ class VJava {
 
             if (isBranchActive(node, getSelectionForNode(node, this.selections), "elsebranch") && node.elsebranch.segments.length > 0 && !node.elsebranch.hidden) {
 
-                var elsebranchMarker = editor.markBufferRange(node.elsebranch.span);
+                var elsebranchMarker = editor.markBufferRange(node.elsebranch.span, {invalidate: 'surround'});
                 this.ui.markers.push(elsebranchMarker);
 
                 editor.decorateMarker(elsebranchMarker, { type: 'line', class: getelsebranchCssClass(node.name) });
@@ -625,7 +625,7 @@ class VJava {
 
 
         } else {
-            node.marker = editor.markBufferRange(node.span);
+            node.marker = editor.markBufferRange(node.span, {invalidate: 'surround'});
         }
     }
 
@@ -775,11 +775,11 @@ class VJava {
     }
 
     activate(state) {
+        console.log(state);
         // TODO: load session from a file somewhere?
-        this.ui = new VJavaUI();
-        this.ui.session = [];
+        this.ui = new VJavaUI(state);
+
         this.nesting = [];
-        this.ui.activeChoices = [];
         this.popupListenerQueue = [];
         this.tooltips = new CompositeDisposable();
 
@@ -793,8 +793,6 @@ class VJava {
         this.parseVJava(contents, () => {
             // Events subscribed to in atom's system can be easily cleaned up with a CompositeDisposable
             this.subscriptions = new CompositeDisposable();
-
-            this.ui.dimensions = [];
 
             this.createUI();
 
@@ -819,19 +817,15 @@ class VJava {
     }
 
     serialize() {
-        var selections = {};
-        //TODO: implement this
-        // $(`#${mainDivId} .dimension-ui-div`).each(function (dn, dim) {
-        //   var dimName = $(dim).find('[id*=thenbranch]').attr('id').split('-thenbranch')[0];
-        //   if($(dim).find('[id*=-thenbranch]').selected) {
-        //     selections[dimName] = 'thenbranch';
-        //   } else if ($(dim).find('[id*=-elsebranch]').selected) {
-        //     selections[dimName] = 'elsebranch';
-        //   } else {
-        //     selections[dimName] = 'unselected';
-        //   }
-        // });
-        return selections;
+        var dims = [];
+        for(var dimension of this.ui.dimensions) {
+            dims.push({color: dimension.color, name: dimension.name, colorpicker: null})
+        }
+        var ses = [];
+        for(var dimension of this.ui.session) {
+            ses.push({color: dimension.color, name: dimension.name, colorpicker: null})
+        }
+        return {session: ses, dimensions: dims, activeChoices: this.ui.activeChoices};
     }
 
     addChoiceSegment() {
