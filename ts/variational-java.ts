@@ -39,9 +39,6 @@ declare global {
         interface Panel {
             destroy();
         }
-        interface IKeymapManager {
-            keyBindings: any;
-        }
     }
 
     interface JQuery {
@@ -120,7 +117,6 @@ class VJava {
     activeChoices: Selector[] // in the form of dimensionId:thenbranch|elsebranch
     subscriptions: CompositeDisposable
     tooltips: CompositeDisposable
-    removedBindings: any[];
 
     // initialize the user interface
     // TODO: make this a function that returns an object conforming to VJavaUI
@@ -813,9 +809,6 @@ class VJava {
                 'variational-java:undo': () => this.noUndoForYou()
             }));
 
-
-            this.removeKeyBindings();
-
             //preserve the contents for later comparison (put, get)
             this.raw = contents;
 
@@ -888,33 +881,15 @@ class VJava {
         this.updateEditorText();
     }
 
-    removeKeyBindings() {
-        this.removedBindings = [];
-        // var remove = ['cmd-z', 'cmd-y', 'ctrl-z', 'ctrl-y'];
-        // atom.keymaps.keyBindings = atom.keymaps.keyBindings.filter((binding, i) => { //disable undo/redo???
-        //     if(remove.indexOf(binding.keystrokes) == -1) {
-        //         return true;
-        //     } else {
-        //         this.removedBindings.push(binding);
-        //         return false;
-        //     }
-        // });
-    }
-
     toggle() {
         var activeEditor = atom.workspace.getActiveTextEditor();
         if (this.ui.panel.isVisible()) {
             this.preserveChanges(activeEditor);
             this.ui.panel.destroy();
             this.ui.dimensions = [];
-            for(var binding of this.removedBindings) {
-                atom.keymaps.keyBindings.push(binding);
-            }
-            this.removedBindings = [];
 
             activeEditor.setText(docToPlainText(this.doc));
         } else {
-            this.removeKeyBindings();
 
             rendering = true; //TODO make use of this lockout once again
 
