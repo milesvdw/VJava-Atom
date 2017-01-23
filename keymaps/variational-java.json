@@ -1,6 +1,12 @@
 {
   "atom-workspace": {
-    "ctrl-alt-o": "variational-java:toggle",
-    "ctrl-i": "variational-java:add-choice-segment"
+  },
+
+  "atom-text-editor": {
+    "ctrl-alt-o": "variational-java:toggle"
+
+  },
+  ".workspace .editor": {
+      "ctrl-z": "variational-java:noUndoForYou"
   }
 }
