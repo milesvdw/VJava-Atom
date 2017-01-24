@@ -7,12 +7,14 @@ declare module 'atom' {
     }
 }
 
-
+import fs from 'fs';
+import path from 'path';
 import $ from 'jquery';
 import 'spectrum-colorpicker';
 import { CompositeDisposable } from 'atom';
+
 import { spawn } from 'child_process';
-import path from 'path';
+
 import {
     Span, RegionNode, SegmentNode, ChoiceNode, ContentNode, renderDocument,
     docToPlainText, ViewRewriter, SpanWalker, NodeInserter, DimensionDeleter,
@@ -116,6 +118,7 @@ class VJava {
     dimensionColors: {}
     activeChoices: Selector[] // in the form of dimensionId:thenbranch|elsebranch
     subscriptions: CompositeDisposable
+    saveSubscription: AtomCore.Disposable
     tooltips: CompositeDisposable
 
     // initialize the user interface
@@ -809,11 +812,35 @@ class VJava {
                 'variational-java:undo': () => this.noUndoForYou()
             }));
 
+            this.saveSubscription = activeEditor.onDidSave(this.handleDidSave.bind(this));
+
             //preserve the contents for later comparison (put, get)
             this.raw = contents;
 
             this.ui.panel.show();
+            var pathBits = activeEditor.getPath().split('.');
+            activeEditor.saveAs(pathBits.splice(0,pathBits.length-1).join('.') + '-temp-vjava.' + pathBits[pathBits.length-1]);
         });
+    }
+
+    getOriginalPath(path : string) : string {
+        var pathBits = path.split('-temp-vjava'); //TODO is there a way to make this not a magic reserved file name?
+        var originalPath = pathBits.splice(0, pathBits.length).join('');
+        return originalPath;
+    }
+
+    handleDidSave(event: {path: string}) {
+        var activeEditor = atom.workspace.getActiveTextEditor();
+        var originalPath = this.getOriginalPath(event.path);
+
+        this.preserveChanges(activeEditor);
+        fs.writeFile(originalPath, docToPlainText(this.doc), function(err) {
+            if(err) {
+                return console.log(err);
+            }
+            console.log("The file was saved!");
+        });
+
     }
 
     noUndoForYou() {
@@ -888,7 +915,14 @@ class VJava {
             this.ui.panel.destroy();
             this.ui.dimensions = [];
 
+
+            var tempPath = activeEditor.getPath();
+            this.saveSubscription.dispose();
             activeEditor.setText(docToPlainText(this.doc));
+            activeEditor.saveAs(this.getOriginalPath(activeEditor.getPath()));
+            fs.unlink(tempPath, function(err) {
+                if(err) console.log(err);
+            });
         } else {
 
             rendering = true; //TODO make use of this lockout once again
@@ -909,6 +943,11 @@ class VJava {
                 this.raw = contents;
 
                 this.ui.panel.show();
+
+                var pathBits = activeEditor.getPath().split('.');
+                activeEditor.saveAs(pathBits.splice(0,pathBits.length-1).join('.') + '-temp-vjava.' + pathBits[pathBits.length-1]);
+                
+                this.saveSubscription = activeEditor.onDidSave(this.handleDidSave.bind(this));
             });
 
             rendering = false
