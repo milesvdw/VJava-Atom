@@ -7,7 +7,7 @@
   "activationCommands": {
     "atom-workspace": "variational-java:toggle"
   },
-  "repository": "https://github.com/atom/variational-java",
+  "repository": "https://github.com/milesvdw/VJava-Atom",
   "license": "MIT",
   "engines": {
     "atom": ">=1.0.0 <2.0.0"
