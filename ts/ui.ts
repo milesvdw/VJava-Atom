@@ -18,6 +18,16 @@ export class Selection {
     elsebranch: boolean
 }
 
+export interface Disposable {
+    dispose() : any
+}
+
+export interface MenuItem {
+    label: string
+    submenu?: MenuItem[]
+    command?: string
+}
+
 export type Branch = "thenbranch" | "elsebranch";
 
 export class VJavaUI {
@@ -29,6 +39,8 @@ export class VJavaUI {
     message: JQuery;
     activeChoices: Selector[];
     markers: AtomCore.IDisplayBufferMarker[];
+    contextMenu: Disposable;
+    menuItems: MenuItem[]
 
 
     constructor({panel = null, session = [], dimensions = [], activeChoices = [], markers = []}) {

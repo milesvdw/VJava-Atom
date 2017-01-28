@@ -31,6 +31,7 @@ declare global {
     namespace AtomCore {
         interface IAtom {
             tooltips: any;
+            contextMenu: any;
         }
 
         interface IEditor {
@@ -120,6 +121,7 @@ class VJava {
     subscriptions: CompositeDisposable
     saveSubscription: AtomCore.Disposable
     tooltips: CompositeDisposable
+    state: "parsed" | "unparsed"
 
     // initialize the user interface
     // TODO: make this a function that returns an object conforming to VJavaUI
@@ -198,6 +200,22 @@ class VJava {
                 });
 
                 this.addViewListeners(dimension);
+
+                this.ui.contextMenu.dispose();
+                this.preserveChanges(atom.workspace.getActiveTextEditor());
+                this.updateEditorText();
+                this.ui.menuItems.push({
+                    label: dimName,
+                    submenu: [{
+                        label: 'When Selected',
+                        command: 'variational-java:add-choice-segment-' + dimName + '-selected'
+                    },
+                    {
+                        label: 'When Unselected',
+                        command: 'variational-java:add-choice-segment-' + dimName + '-unselected'
+                    }]
+                })
+                this.ui.contextMenu = atom.contextMenu.add({'atom-text-editor': [{label: 'Insert Choice', submenu: this.ui.menuItems}]});
 
 
                 dimension.colorpicker = $(document.getElementById(dimension.name + '-colorpicker')).spectrum({
@@ -526,6 +544,28 @@ class VJava {
                 });
 
 
+
+                var menuItem = {
+                    label: node.name,
+                    submenu: [{
+                        label: 'When Selected',
+                        command: 'variational-java:add-choice-segment-' + node.name + '-selected'
+                    },
+                    {
+                        label: 'When Unselected',
+                        command: 'variational-java:add-choice-segment-' + node.name + '-unselected'
+                    }]
+                }
+                var whenSelectedSub = {};
+                whenSelectedSub[`variational-java:add-choice-segment-${node.name}-selected`] = () => this.addChoiceSegment(node.name, "thenbranch");
+                var whenUnselectedSub = {};
+                whenUnselectedSub[`variational-java:add-choice-segment-${node.name}-unselected`] = () => this.addChoiceSegment(node.name, "elsebranch");
+
+                this.subscriptions.add(atom.commands.add('atom-text-editor', whenSelectedSub));
+                this.subscriptions.add(atom.commands.add('atom-text-editor', whenUnselectedSub));
+
+                this.ui.menuItems.push(menuItem);
+
                 //first try to use the color on the dimension
                 var uiColor: string = this.ui.getColorForNode(node);
 
@@ -660,6 +700,13 @@ class VJava {
         var deleter = new DimensionDeleter(selection);
         this.doc = deleter.rewriteRegion(this.doc);
         this.updateEditorText();
+        for(var i = 0; i < this.ui.menuItems.length; i ++) {
+            if(this.ui.menuItems[i].label === selection.name) {
+                this.ui.menuItems.splice(i, 1);
+            }
+        }
+        this.ui.contextMenu.dispose();
+        this.ui.contextMenu = atom.contextMenu.add({'atom-text-editor': [{label: 'Insert Choice', submenu: this.ui.menuItems}]});
     }
 
     deleteBranch(region: RegionNode, editor: AtomCore.IEditor) {
@@ -778,11 +825,13 @@ class VJava {
     }
 
     activate(state) {
+        this.state = "parsed"
         console.log(state);
         // TODO: load session from a file somewhere?
         this.ui = new VJavaUI(state);
 
         this.nesting = [];
+        this.ui.menuItems = [];
         this.popupListenerQueue = [];
         this.tooltips = new CompositeDisposable();
 
@@ -801,12 +850,11 @@ class VJava {
 
             this.updateEditorText();
 
+            this.ui.contextMenu = atom.contextMenu.add({'atom-text-editor': [{label: 'Insert Choice', submenu: this.ui.menuItems}]});
+
             // Register command that toggles vjava view
             this.subscriptions.add(atom.commands.add('atom-workspace', {
                 'variational-java:toggle': () => this.toggle()
-            }));
-            this.subscriptions.add(atom.commands.add('atom-workspace', {
-                'variational-java:add-choice-segment': () => this.addChoiceSegment()
             }));
             this.subscriptions.add(atom.commands.add('atom-workspace', {
                 'variational-java:undo': () => this.noUndoForYou()
@@ -844,7 +892,13 @@ class VJava {
     }
 
     noUndoForYou() {
-
+        if(this.state === "parsed") return;
+        for(var map of atom.keymaps.keyBindings) {
+            if(map.command.includes('undo')) {
+                console.log(map);
+            }
+        }
+        atom.commands.dispatch(atom.views.getView(atom.workspace.getActiveTextEditor()), "core:undo");
     }
 
     deactivate() {
@@ -862,12 +916,7 @@ class VJava {
         return {session: ses, dimensions: dims, activeChoices: this.ui.activeChoices};
     }
 
-    addChoiceSegment() {
-
-        if (!this.ui.activeChoices[0]) {
-            alert('please make a selection before inserting a choice segment');
-            return;
-        };
+    addChoiceSegment(dim: string, branch: Branch) {
 
         var activeEditor = atom.workspace.getActiveTextEditor();
 
@@ -876,11 +925,6 @@ class VJava {
 
         //we have to grab the zero index for some stupid reason
         var location = activeEditor.getCursorBufferPosition();
-
-        //TODO support inserting nested dimensions?
-        var choice = this.ui.activeChoices[0];
-        var branch: Branch = choice.branch;
-        var dim = choice.name;
 
         var node: ChoiceNode = {
             span: null, // we don't know what it's span will be
@@ -897,7 +941,7 @@ class VJava {
             {
                 span: null, //no idea what this will be
                 marker: null,// do this later?
-                content: '\n' + lit,
+                content: '\n' + lit + '\n',
                 type: 'text'
             }
         ];
@@ -910,10 +954,12 @@ class VJava {
 
     toggle() {
         var activeEditor = atom.workspace.getActiveTextEditor();
-        if (this.ui.panel.isVisible()) {
+        if (this.state === "parsed") {
+            this.state = "unparsed"
             this.preserveChanges(activeEditor);
             this.ui.panel.destroy();
             this.ui.dimensions = [];
+            this.ui.menuItems = [];
 
 
             var tempPath = activeEditor.getPath();
@@ -923,8 +969,9 @@ class VJava {
             fs.unlink(tempPath, function(err) {
                 if(err) console.log(err);
             });
+            this.ui.contextMenu.dispose();
         } else {
-
+            this.state = "parsed"
             rendering = true; //TODO make use of this lockout once again
 
             var contents = activeEditor.getText();
@@ -938,6 +985,8 @@ class VJava {
                 this.createUI();
 
                 this.updateEditorText();
+                //set up context menu here
+                this.ui.contextMenu = atom.contextMenu.add({'atom-text-editor': [{label: 'Insert Choice', submenu: this.ui.menuItems}]});
 
                 //preserve the contents for later comparison (put, get)
                 this.raw = contents;
@@ -946,7 +995,7 @@ class VJava {
 
                 var pathBits = activeEditor.getPath().split('.');
                 activeEditor.saveAs(pathBits.splice(0,pathBits.length-1).join('.') + '-temp-vjava.' + pathBits[pathBits.length-1]);
-                
+
                 this.saveSubscription = activeEditor.onDidSave(this.handleDidSave.bind(this));
             });
 
