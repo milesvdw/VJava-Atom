@@ -550,6 +550,7 @@ class VJava {
                     var elseHiddenMarker = editor.markBufferPosition(node.thenbranch.span.end);
                     this.ui.markers.push(elseHiddenMarker);
                     editor.decorateMarker(elseHiddenMarker, { type: 'block', position: 'before', item: element });
+                    element.onclick = () => { $(`#${node.name}-view-both`).click(); };
                 }
 
                 this.nesting.push({ selector: { name: node.name, branch: "thenbranch" }, dimension: node });
@@ -586,6 +587,7 @@ class VJava {
                     var thenHiddenMarker = editor.markBufferPosition(node.elsebranch.span.start);
                     this.ui.markers.push(thenHiddenMarker);
                     editor.decorateMarker(thenHiddenMarker, { type: 'block', position: 'before', item: element });
+                    element.onclick = () => { $(`#${node.name}-view-both`).click(); };
                 }
 
 
