@@ -20,7 +20,13 @@ int dummy() {
 
       return x;
 
+
+#ifdef DEC
+new dimension
+#endif
+
   }
+
 1
 2
 3

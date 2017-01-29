@@ -34,6 +34,10 @@ declare global {
             contextMenu: any;
         }
 
+        interface IKeymapManager {
+            keyBindings: any;
+        }
+
         interface IEditor {
             getTextInBufferRange(span: Span): string;
             getTextInBufferRange(span: number[][]): string;
@@ -182,16 +186,21 @@ class VJava {
                 nameDiv.remove();
 
                 var dimDiv = $(`<div class='form-group dimension-ui-div' id='${dimName}'>
-            <a href='' id='removeDimension-${dimName}'><img id='removeDimensionImg' class='delete_icon' border="0" src="${iconsPath}/delete-bin.png" width="16" height="18"/> </a>
-            <input class="jscolor" id="${dimName}-colorpicker" value="ab2567">
-            <h2>${dimName}</h2
-            <br>
-            <span class='edit edit-enabled' id='${dimName}-edit-thenbranch'>&#9998;</span>
-            <span class='view view-enabled' id='${dimName}-view-thenbranch'>&#128065;</span>
-                <span class='choice-label' id='${dimName}-thenbranch-text'>defined</span><br>
-            <span class='edit edit-enabled' id='${dimName}-edit-elsebranch'>&#9998;</span>
-            <span class='view view-enabled' id='${dimName}-view-elsebranch'>&#128065;</span>
-                <span class='choice-label' id='${dimName}-elsebranch-text'>undefined</span><br></div>`);
+                    <a href='' id='removeDimension-${dimName}'><img id='removeDimensionImg' class='delete_icon' border="0" src="${iconsPath}/delete-bin.png" width="16" height="18"/> </a>
+                    <input class="jscolor" id="${dimName}-colorpicker" value="ab2567">
+                    <h2>${dimName}</h2
+                    <br>
+                    <div class="switch-toggle switch-3 switch-candy">
+                        <input id="${dimName}-view-thenbranch" name="state-d" type="radio" checked="">
+                        <label for="${dimName}-view-thenbranch">DEF</label>
+
+                        <input id="${dimName}-view-both" name="state-d" type="radio" checked="checked">
+                            <label for="${dimName}-view-both">BOTH</label>
+
+                        <input id="${dimName}-view-elsebranch" name="state-d" type="radio">
+                        <label for="${dimName}-view-elsebranch">NDEF</label>
+                    </div>
+                    <br></div>`);
                 this.ui.main.append(dimDiv);
 
 
@@ -232,99 +241,19 @@ class VJava {
     }
 
     addViewListeners(dimension: DimensionUI) {
-        $(`#${dimension.name}-disable-elsebranch`).on('click', () => {
-            //switch the elsebranch branch to view mode
-            $(`#${dimension.name}-view-elsebranch`).show();
-            $(`#${dimension.name}-disable-elsebranch`).hide();
-
-            //make appropriate changes to the document
+        $(`#${dimension.name}-view-both`).on('click', () => {
             this.selectelsebranch(dimension.name);
-        });
-
-        $(`#${dimension.name}-view-elsebranch`).on('click', () => {
-            //put the elsebranch alternative in edit mode
-            $(`#${dimension.name}-view-elsebranch`).hide();
-            $(`#${dimension.name}-edit-elsebranch`).show();
-            this.toggleDimensionEdit(dimension, 'elsebranch');
-
-            //ensure that the thenbranch alternative isn't in edit mode
-            if ($(`#${dimension.name}-edit-thenbranch`).is(":visible")) {
-                $(`#${dimension.name}-view-thenbranch`).show();
-                $(`#${dimension.name}-edit-thenbranch`).hide();
-
-                //remove the thenbranch selection since one has been made
-                this.ui.removeActiveChoice(dimension.name, "thenbranch");
-
-            }
-
-            this.ui.updateActiveChoices(dimension.name, "elsebranch");
-        });
-
-        $(`#${dimension.name}-edit-elsebranch`).on('click', () => {
-            //go back to viewing
-            $(`#${dimension.name}-view-elsebranch`).show();
-            $(`#${dimension.name}-edit-elsebranch`).hide();
-
-            //remove the elsebranch selection since we have toggled that off
-            this.ui.removeActiveChoice(dimension.name, "elsebranch");
-        });
-
-        $(`#${dimension.name}-view-elsebranch`).on('contextmenu', () => {
-            //as long as the thenbranch alternative isn't also hidden, hide this one
-            if (!$(`#${dimension.name}-disable-thenbranch`).is(":visible")) {
-                //put the elsebranch alternative in edit mode
-                $(`#${dimension.name}-view-elsebranch`).hide();
-                $(`#${dimension.name}-disable-elsebranch`).show();
-                this.unselectelsebranch(dimension.name);
-            }
-            return false;
-        });
-
-
-        $(`#${dimension.name}-disable-thenbranch`).on('click', () => {
-            //switch the elsebranch branch to view mode
-            $(`#${dimension.name}-view-thenbranch`).show();
-            $(`#${dimension.name}-disable-thenbranch`).hide();
-
-            //make appropriate changes to the document
             this.selectthenbranch(dimension.name);
         });
 
+        $(`#${dimension.name}-view-elsebranch`).on('click', () => {
+            this.unselectthenbranch(dimension.name);
+            this.selectelsebranch(dimension.name);
+        });
+
         $(`#${dimension.name}-view-thenbranch`).on('click', () => {
-            //put the elsebranch alternative in edit mode
-            $(`#${dimension.name}-view-thenbranch`).hide();
-            $(`#${dimension.name}-edit-thenbranch`).show();
-
-            //ensure that the elsebranch alternative isn't in edit mode
-            if ($(`#${dimension.name}-edit-elsebranch`).is(":visible")) {
-                $(`#${dimension.name}-view-elsebranch`).show();
-                $(`#${dimension.name}-edit-elsebranch`).hide();
-
-                //remove the thenbranch selection since one has been made
-                this.ui.removeActiveChoice(dimension.name, "elsebranch");
-
-            }
-            this.ui.updateActiveChoices(dimension.name, "thenbranch")
-        });
-
-        $(`#${dimension.name}-edit-thenbranch`).on('click', () => {
-            //go back to viewing
-            $(`#${dimension.name}-view-thenbranch`).show();
-            $(`#${dimension.name}-edit-thenbranch`).hide();
-
-            //remove the then selection since it has been toggled off
-            this.ui.removeActiveChoice(dimension.name, "thenbranch");
-        });
-
-        $(`#${dimension.name}-view-thenbranch`).on('contextmenu', () => {
-            //as long as the elsebranch alternative isn't also hidden, hide this one
-            if (!$(`#${dimension.name}-disable-elsebranch`).is(":visible")) {
-                //put the thenbranch alternative in edit mode
-                $(`#${dimension.name}-view-thenbranch`).hide();
-                $(`#${dimension.name}-disable-thenbranch`).show();
-                this.unselectthenbranch(dimension.name);
-            }
-            return false;
+            this.selectthenbranch(dimension.name);
+            this.unselectelsebranch(dimension.name);
         });
     }
 
@@ -524,18 +453,19 @@ class VJava {
               <input type='text' id="${node.name}-colorpicker">
               <h2>${node.name}</h2>
               <br>
-              <span class='toggle-thenbranch'>
-              <span class='edit' id='${node.name}-disable-thenbranch' style='display: none;'>&nbsp;&nbsp;&nbsp;</span>
-              <span class='edit edit-enabled' id='${node.name}-edit-thenbranch' style='display: none;'>&#9998;</span>
-              <span class='view view-enabled' id='${node.name}-view-thenbranch'>&#128065;</span>
-              </span>
-              <span class='choice-label' id='${node.name}-thenbranch-text'>defined</span><br>
-              <span class='toggle-elsebranch'>
-              <span class='edit' id='${node.name}-disable-elsebranch' style='display: none;'>&nbsp;&nbsp;&nbsp;</span>
-              <span class='edit edit-enabled' id='${node.name}-edit-elsebranch' style='display: none;'>&#9998;</span>
-              <span class='view view-enabled' id='${node.name}-view-elsebranch'>&#128065;</span>
-              </span>
-              <span class='choice-label' id='${node.name}-elsebranch-text'>undefined</span><br></div>  `);
+              <div class="switch-toggle switch-3 switch-candy">
+                  <input id="${node.name}-view-thenbranch" name="state-d" type="radio" checked="">
+                  <label for="${node.name}-view-thenbranch">DEF</label>
+
+                  <input id="${node.name}-view-both" name="state-d" type="radio" checked="checked">
+                      <label for="${node.name}-view-both">BOTH</label>
+
+                  <input id="${node.name}-view-elsebranch" name="state-d" type="radio">
+                  <label for="${node.name}-view-elsebranch">NDEF</label>
+
+                  <a></a>
+              </div>
+              <br></div>  `);
                 this.ui.main.append(dimDiv);
 
                 //only hook up listeners, etc. once!
