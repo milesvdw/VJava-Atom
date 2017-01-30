@@ -1,4 +1,4 @@
-atom.exports =
+module.exports =
 {
   #Create a selection
   #name: the name of the dimension to select on

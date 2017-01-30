@@ -21,6 +21,7 @@
 #   }
 #   type:"choice"
 #]
+module.exports=
 class CCModel
   model: null
 

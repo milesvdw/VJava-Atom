@@ -1,5 +1,6 @@
-class VJavaTextEditorVeiw
-  constructor: (serializedState) ->
+class ProjectionVeiw
+
+	constructor: (serializedState) ->
     # Create root element
     @element = $("div")
     @element.classList.add('cc-ide');

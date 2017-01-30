@@ -9,9 +9,8 @@ CCInterface = require './cc-interface.coffee'
 ui = require './UI/renderTools.coffee'
 FoldRender = require './UI/FoldRender.coffee'
 ColorRender = require './UI/ColorRender.coffee'
-selection = (require './TextEditor/JSONConstructor.coffee').selection
-projection = (require './TextEditor/JSONConstructor.coffee').projection
-
+cc = require './TextEditor/JSONConstructor.coffee'
+CCModel = require './TextEditor/CCModel.coffee'
 
 module.exports = vjava =
 	ccIdeView: null
@@ -71,12 +70,13 @@ module.exports = vjava =
 			parser = new CCInterface();
 			parser.parseVJava(text, (data) =>
 					console.log(data);
-					select = selection("blah", true)
-					project = projection(data.segments, [select])
+					select = cc.selection("blah", true)
+					project = cc.projection(data.segments, [select])
 					parser = new CCInterface();
 
 					parser.makeSelection(project, (data) =>
 						console.log(data)
+
 					)
 					# @foldRender.foldChoices(data);
 					# @colorRender.renderColor(data);
