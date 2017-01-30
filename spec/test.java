@@ -1,8 +1,7 @@
-blah
-blah
-#dimension blah
-some other blahs
+outsideCont1
+#ifdef blah
+rightChoice
 #else
-yet more blahs
-#end
-blah
+leftChoice
+#endif
+outsideCont2

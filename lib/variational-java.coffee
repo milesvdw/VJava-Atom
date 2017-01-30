@@ -9,6 +9,9 @@ CCInterface = require './cc-interface.coffee'
 ui = require './UI/renderTools.coffee'
 FoldRender = require './UI/FoldRender.coffee'
 ColorRender = require './UI/ColorRender.coffee'
+selection = (require './TextEditor/JSONConstructor.coffee').selection
+projection = (require './TextEditor/JSONConstructor.coffee').projection
+
 
 module.exports = vjava =
 	ccIdeView: null
@@ -67,27 +70,35 @@ module.exports = vjava =
 
 			parser = new CCInterface();
 			parser.parseVJava(text, (data) =>
-					@foldRender.foldChoices(data);
-					@colorRender.renderColor(data);
-			)
+					console.log(data);
+					select = selection("blah", true)
+					project = projection(data.segments, [select])
+					parser = new CCInterface();
 
-			@toggleSubscriptions.add(editor.onDidStopChanging =>
-				text = atom.workspace.getActiveTextEditor().getText();
-				parser = new CCInterface();
-
-				parser.parseVJava(text, (data) =>
-					@foldRender.foldChoices(data);
-					@colorRender.renderColor(data);
-
+					parser.makeSelection(project, (data) =>
+						console.log(data)
 					)
+					# @foldRender.foldChoices(data);
+					# @colorRender.renderColor(data);
 			)
-			@toggleOn = true;
-		else
-			@foldRender.derenderFolds()
-			@colorRender.derenderColor();
-			@toggleSubscriptions.dispose();
-			@toggleOn = false;
 
+		# 	@toggleSubscriptions.add(editor.onDidStopChanging =>
+		# 		text = atom.workspace.getActiveTextEditor().getText();
+		# 		parser = new CCInterface();
+		#
+		# 		parser.parseVJava(text, (data) =>
+		# 			@foldRender.foldChoices(data);
+		# 			@colorRender.renderColor(data);
+		#
+		# 			)
+		# 	)
+		# 	@toggleOn = true;
+		# else
+		# 	@foldRender.derenderFolds()
+		# 	@colorRender.derenderColor();
+		# 	@toggleSubscriptions.dispose();
+		# 	@toggleOn = false;
+		#
 		# command = new ConsoleCommand();
 		# command.runCommand("dir", [], {}, (error, stderr, stdout) ->
 		# 	console.log("Output " + stdout)
