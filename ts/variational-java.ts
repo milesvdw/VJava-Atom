@@ -18,7 +18,8 @@ import { spawn } from 'child_process';
 import {
     Span, RegionNode, SegmentNode, ChoiceNode, ContentNode, renderDocument,
     docToPlainText, ViewRewriter, SpanWalker, NodeInserter, DimensionDeleter,
-    EditPreserver, getSelectionForDim, getSelectionForNode, isBranchActive
+    EditPreserver, getSelectionForDim, getSelectionForNode, isBranchActive,
+    AlternativeInserter
 } from './ast';
 import { VJavaUI, DimensionUI, Branch, Selector, Selection, NestLevel } from './ui'
 
@@ -540,7 +541,27 @@ class VJava {
                     element.classList.add(nestclass);
                 }
 
-                if (node.elsebranch.hidden) {
+                if (node.elsebranch.segments.length == 0) {
+                    element.textContent = '(+)';
+                    element.classList.add(`insert-alt-${node.name}`);
+                    element.classList.add(`insert-alt`);
+                    element.classList.add(getelsebranchCssClass(node.name));
+
+                    var elseHiddenMarker = editor.markBufferPosition(node.thenbranch.span.end);
+                    this.ui.markers.push(elseHiddenMarker);
+                    editor.decorateMarker(elseHiddenMarker, { type: 'block', position: 'before', item: element });
+                    var vjava = this;
+                    element.onclick = () => {
+                        vjava.preserveChanges(editor);
+                        var newNode : ContentNode = {
+                            type: "text",
+                            content: "\nFill in the second alternative\n"
+                        };
+                        var inserter = new AlternativeInserter(newNode, thenbranchMarker.getBufferRange().end, "elsebranch", node.name);
+                        vjava.doc = inserter.rewriteRegion(vjava.doc);
+                        vjava.updateEditorText();
+                    };
+                } else if (node.elsebranch.hidden) {
                     element.textContent = '(...)';
                     element.classList.add(`hover-alt-${node.name}`);
                     element.classList.add(`hover-alt`);
@@ -576,7 +597,27 @@ class VJava {
 
                 var element = document.createElement('div');
 
-                if (node.thenbranch.hidden) {
+                if (node.thenbranch.segments.length == 0) {
+                    element.textContent = '(+)';
+                    element.classList.add(`insert-alt-${node.name}`);
+                    element.classList.add(`insert-alt`);
+                    element.classList.add(getthenbranchCssClass(node.name));
+
+                    var thenHiddenMarker = editor.markBufferPosition(node.elsebranch.span.start);
+                    this.ui.markers.push(thenHiddenMarker);
+                    editor.decorateMarker(thenHiddenMarker, { type: 'block', position: 'before', item: element });
+                    var vjava = this;
+                    element.onclick = () => {
+                        vjava.preserveChanges(editor);
+                        var newNode : ContentNode = {
+                            type: "text",
+                            content: "Fill in the second alternative"
+                        };
+                        var inserter = new AlternativeInserter(newNode, elsebranchMarker.getBufferRange().end, "thenbranch", node.name);
+                        vjava.doc = inserter.rewriteRegion(vjava.doc);
+                        vjava.updateEditorText();
+                    };
+                } else if (node.thenbranch.hidden) {
                     element.textContent = '(...)';
                     element.classList.add(`hover-alt-${node.name}`);
                     element.classList.add(`hover-alt`);
@@ -893,6 +934,10 @@ class VJava {
             this.ui.dimensions = [];
             this.ui.menuItems = [];
 
+            for(var marker of this.ui.markers) {
+                marker.destroy();
+            }
+            this.ui.markers = [];
 
             var tempPath = activeEditor.getPath();
             this.saveSubscription.dispose();

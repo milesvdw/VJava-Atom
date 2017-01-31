@@ -270,6 +270,71 @@ export class NodeInserter extends SyntaxRewriter {
 
 }
 
+export class AlternativeInserter extends SyntaxRewriter {
+
+    constructor(public altNode: SegmentNode, public location: TextBuffer.IPoint, public branch: Branch, public dimension: string) {
+        super();
+    }
+
+    rewriteChoice(node: ChoiceNode) {
+        var newthenbranch : RegionNode;
+        var newelsebranch;
+        const newNode: ChoiceNode = copyFromChoice(node);
+
+        if(this.branch === "elsebranch"
+            && node.elsebranch.span.end[0] === this.location.row && node.elsebranch.span.end[1] === this.location.column && node.name === this.dimension) { // if this is exactly the endpoint of the span, and the correct dimension
+            if(node.elsebranch.segments.length != 0) throw "This alternative already exists";
+            else newelsebranch = {
+                type: "region",
+                segments: [this.altNode]
+            }
+            newthenbranch = super.rewriteRegion(node.thenbranch);
+        } else if(this.branch === "thenbranch"
+            && node.thenbranch.span.end[0] === this.location.row && node.thenbranch.span.end[1] === this.location.column && node.name === this.dimension) {
+            if(node.thenbranch.segments.length != 0) throw "This alternative already exists";
+            else newthenbranch = {
+                type: "region",
+                segments: [this.altNode]
+            }
+            newelsebranch = super.rewriteRegion(node.elsebranch);
+        } else {
+            newthenbranch = this.rewriteRegion(node.thenbranch);
+            newelsebranch = this.rewriteRegion(node.elsebranch);
+        }
+
+        newNode.thenbranch = newthenbranch;
+        newNode.elsebranch = newelsebranch;
+
+        return [newNode];
+    }
+
+    rewriteDocument(doc: RegionNode) {
+        //walk the span before and after we do the change, because spans have semantic meaning here
+        const walker = new SpanWalker();
+        walker.visitRegion(doc);
+        const newDoc = this.rewriteRegion(doc);
+        walker.visitRegion(newDoc);
+        return newDoc;
+    }
+
+    rewriteRegion(region: RegionNode): RegionNode {
+        var newSegments: SegmentNode[] = []
+        for (var segment of region.segments) {
+            if (inclusiveSpanContainsPoint(segment.span, this.location)) {
+                if (segment.type === 'choice') {
+                    newSegments = newSegments.concat(this.rewriteChoice(segment));
+                } else {
+                    newSegments = newSegments.concat(this.rewriteContent(segment));
+                }
+            } else {
+                newSegments.push(segment);
+            }
+        }
+        var newRegion: RegionNode = { segments: newSegments, type: "region", span: region.span };
+        return newRegion;
+    }
+}
+
 export class EditPreserver extends SyntaxWalker {
     constructor(public editor: AtomCore.IEditor, public selections: Selection[]) {
         super();
@@ -381,7 +446,19 @@ function spanContainsPoint(outer: Span, inner: TextBuffer.IPoint): boolean {
         &&
         ((outer.end[0] > inner.row)
             ||
-            (outer.end[1] > inner.column && outer[1] === inner.column))
+            (outer.end[1] > inner.column && outer.end[0] === inner.row))
+    )
+}
+
+function inclusiveSpanContainsPoint(outer: Span, inner: TextBuffer.IPoint) : boolean {
+    return (
+        ((outer.start[0] === inner.row && outer.start[1] < inner.column) // exclusive at the beginning, inclusive at the end
+            ||
+            (outer.start[0] < inner.row)) // if the outer span starts before the second Span
+        &&
+        ((outer.end[0] > inner.row)
+            ||
+            (outer.end[1] >= inner.column && outer.end[0] === inner.row))
     )
 }
 
