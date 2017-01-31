@@ -17,6 +17,14 @@
             {
               "label": "Toggle",
               "command": "variational-java:toggle"
+            },
+            {
+              "label": "Select Right",
+              "command": "variational-java:selectRight"
+            },
+            {
+              "label": "Select Left",
+              "command": "variational-java:selectLeft"
             }
           ]
         }

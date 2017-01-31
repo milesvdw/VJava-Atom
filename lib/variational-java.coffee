@@ -11,6 +11,7 @@ FoldRender = require './UI/FoldRender.coffee'
 ColorRender = require './UI/ColorRender.coffee'
 cc = require './TextEditor/JSONConstructor.coffee'
 CCModel = require './TextEditor/CCModel.coffee'
+DimVeiw = require './UI/DimVeiw.coffee'
 
 module.exports = vjava =
 	ccIdeView: null
@@ -21,11 +22,11 @@ module.exports = vjava =
 	foldRender:null
 	colorRender:null
 	activate: (state) ->
-		@ccIdeView = new VariationalJavaView(state.ccIdeViewState);
-		@modalPanel = atom.workspace.addRightPanel({
-			item: this.ccIdeView.getElement(),
-			visible: false,
-		});
+		@ccIdeView = new DimVeiw();
+		# @modalPanel = atom.workspace.addTopPanel({
+		# 	item: @ccIdeView.getElement(),
+		# 	visible: false,
+		# });
 
 
 		# Events subscribed to in atom's system can be easily cleaned up with a CompositeDisposable
@@ -59,28 +60,25 @@ module.exports = vjava =
 		if !@toggleOn
 			editor = atom.workspace.getActiveTextEditor();
 
-			@foldRender = new FoldRender(editor);
-			@colorRender = new ColorRender(editor)
-
-			@foldRender.initEvents();
-			@colorRender.initEvents();
-
 			text = editor.getText();
 
 			parser = new CCInterface();
 			parser.parseVJava(text, (data) =>
-					console.log(data);
-					select = cc.selection("blah", true)
-					project = cc.projection(data.segments, [select])
-					parser = new CCInterface();
-
-					parser.makeSelection(project, (data) =>
-						console.log(data)
-
-					)
+				view = new DimVeiw(null, editor);
+				view.setModel(new CCModel(data));
+				@modalPanel = atom.workspace.addTopPanel({
+		 			item: view.getElement(),
+		 			visible: true,
+		 		});
+			)
+			@toggleOn = true
+		else
+			@modalPanel.hide()
+			@modalPanel.destroy()
+			@toggleOn = false;
 					# @foldRender.foldChoices(data);
 					# @colorRender.renderColor(data);
-			)
+
 
 		# 	@toggleSubscriptions.add(editor.onDidStopChanging =>
 		# 		text = atom.workspace.getActiveTextEditor().getText();
