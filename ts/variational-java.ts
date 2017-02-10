@@ -334,7 +334,7 @@ class VJava {
             var selectors = [];
             var nestColors = [];
 
-            if (this.nesting.length > 0) {
+            if (this.nesting.length > 0)  {
                 for (var j = 0; j < this.nesting.length; j++) {
                     //nesting class format: 'nested-[DIM ID]-[BRANCH]-[LEVEL]'
                     selectors.push('.nested-' + this.nesting[j].selector.name + '-' + this.nesting[j].selector.branch + '-' + j);
@@ -351,7 +351,7 @@ class VJava {
                     nestColors.push(nestcolor);
                 }
 
-                var selector = selectors.join(' ');
+                var selector = selectors.join('');
                 //construct the nest gradient
                 var x = 0;
                 var increment = 1;
@@ -799,7 +799,6 @@ class VJava {
 
     activate(state) {
         this.state = "parsed"
-        console.log(state);
         // TODO: load session from a file somewhere?
         this.ui = new VJavaUI(state);
 
@@ -866,11 +865,6 @@ class VJava {
 
     noUndoForYou() {
         if(this.state === "parsed") return;
-        for(var map of atom.keymaps.keyBindings) {
-            if(map.command.includes('undo')) {
-                console.log(map);
-            }
-        }
         atom.commands.dispatch(atom.views.getView(atom.workspace.getActiveTextEditor()), "core:undo");
     }
 
