@@ -1,0 +1,8 @@
+-> BUG: dimension sidebar doesn't show up first time
+-> FEATURE: remove alternative
+
+2/21/2017
+X BUG: classList undefined error
+X BUG: checkboxes are all exclusive
+X BUG: alternative adder for ifndefs wrong color
+X BUG: can't add alternate alternative more than once per run

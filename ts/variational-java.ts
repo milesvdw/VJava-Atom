@@ -192,13 +192,13 @@ class VJava {
                     <h2>${dimName}</h2
                     <br>
                     <div class="switch-toggle switch-3 switch-candy">
-                        <input id="${dimName}-view-thenbranch" name="state-d" type="radio" checked="">
+                        <input id="${dimName}-view-thenbranch" name="state-${dimName}" type="radio" checked="">
                         <label for="${dimName}-view-thenbranch">DEF</label>
 
-                        <input id="${dimName}-view-both" name="state-d" type="radio" checked="checked">
+                        <input id="${dimName}-view-both" name="state-${dimName}" type="radio" checked="checked">
                             <label for="${dimName}-view-both">BOTH</label>
 
-                        <input id="${dimName}-view-elsebranch" name="state-d" type="radio">
+                        <input id="${dimName}-view-elsebranch" name="state-${dimName}" type="radio">
                         <label for="${dimName}-view-elsebranch">NDEF</label>
                     </div>
                     <br></div>`);
@@ -317,18 +317,18 @@ class VJava {
             //find the color for the thenbranch alternative
             if (node.kind === 'positive') {
                 var thenbranchcolor = shadeColor(color, .1);
-                var thenbranchcursorcolor = shadeColor(color, .15);
-                var thenbranchhighlightcolor = shadeColor(color, .35);
-                var elsebranchcolor = shadeColor(color, -.1);
-                var elsebranchcursorcolor = shadeColor(color, -.05);
-                var elsebranchhighlightcolor = shadeColor(color, -.15);
+                var thenbranchcursorcolor = shadeColor(color, .2);
+                var thenbranchhighlightcolor = shadeColor(color, .3);
+                var elsebranchcolor = shadeColor(color, -.3);
+                var elsebranchcursorcolor = shadeColor(color, -.2);
+                var elsebranchhighlightcolor = shadeColor(color, -.1);
             } else {
-                var thenbranchcursorcolor = shadeColor(color, -.05);
-                var thenbranchhighlightcolor = shadeColor(color, .15);
-                var thenbranchcolor = shadeColor(color, -.1);
+                var thenbranchcursorcolor = shadeColor(color, -.2);
+                var thenbranchhighlightcolor = shadeColor(color, -.1);
+                var thenbranchcolor = shadeColor(color, -.3);
                 var elsebranchcolor = shadeColor(color, .1);
-                var elsebranchcursorcolor = shadeColor(color, .15);
-                var elsebranchhighlightcolor = shadeColor(color, .35);
+                var elsebranchcursorcolor = shadeColor(color, .2);
+                var elsebranchhighlightcolor = shadeColor(color, .3);
             }
 
             var selectors = [];
@@ -346,7 +346,7 @@ class VJava {
 
                     //nest in the correct branch color
                     if ((branch === 'thenbranch' && kind === 'positive') || (branch === 'elsebranch' && kind === 'contrapositive')) nestcolor = shadeColor(nestcolor, .1);
-                    else nestcolor = shadeColor(nestcolor, -.1);
+                    else nestcolor = shadeColor(nestcolor, -.3);
 
                     nestColors.push(nestcolor);
                 }
@@ -455,13 +455,13 @@ class VJava {
               <h2>${node.name}</h2>
               <br>
               <div class="switch-toggle switch-3 switch-candy">
-                  <input id="${node.name}-view-thenbranch" name="state-d" type="radio" checked="">
+                  <input id="${node.name}-view-thenbranch" name="state-${node.name}" type="radio" checked="">
                   <label for="${node.name}-view-thenbranch">DEF</label>
 
-                  <input id="${node.name}-view-both" name="state-d" type="radio" checked="checked">
+                  <input id="${node.name}-view-both" name="state-${node.name}" type="radio" checked="checked">
                       <label for="${node.name}-view-both">BOTH</label>
 
-                  <input id="${node.name}-view-elsebranch" name="state-d" type="radio">
+                  <input id="${node.name}-view-elsebranch" name="state-${node.name}" type="radio">
                   <label for="${node.name}-view-elsebranch">NDEF</label>
 
                   <a></a>
@@ -558,7 +558,7 @@ class VJava {
                             content: "\nFill in the second alternative\n"
                         };
                         var inserter = new AlternativeInserter(newNode, thenbranchMarker.getBufferRange().end, "elsebranch", node.name);
-                        vjava.doc = inserter.rewriteRegion(vjava.doc);
+                        vjava.doc = inserter.rewriteDocument(vjava.doc);
                         vjava.updateEditorText();
                     };
                 } else if (node.elsebranch.hidden) {
@@ -587,7 +587,9 @@ class VJava {
                 var elsebranchMarker = editor.markBufferRange(node.elsebranch.span, {invalidate: 'surround'});
                 this.ui.markers.push(elsebranchMarker);
 
+                var element = document.createElement('div');
                 editor.decorateMarker(elsebranchMarker, { type: 'line', class: getelsebranchCssClass(node.name) });
+
                 for (var i = this.nesting.length - 1; i >= 0; i--) {
                     //nesting class format: 'nested-[DIM ID]-[BRANCH]-[LEVEL]'
                     var nestclass = 'nested-' + this.nesting[i].selector.name + '-' + this.nesting[i].selector.branch + '-' + i;
@@ -595,7 +597,6 @@ class VJava {
                     element.classList.add(nestclass);
                 }
 
-                var element = document.createElement('div');
 
                 if (node.thenbranch.segments.length == 0) {
                     element.textContent = '(+)';
@@ -614,7 +615,7 @@ class VJava {
                             content: "Fill in the second alternative"
                         };
                         var inserter = new AlternativeInserter(newNode, elsebranchMarker.getBufferRange().end, "thenbranch", node.name);
-                        vjava.doc = inserter.rewriteRegion(vjava.doc);
+                        vjava.doc = inserter.rewriteDocument(vjava.doc);
                         vjava.updateEditorText();
                     };
                 } else if (node.thenbranch.hidden) {
