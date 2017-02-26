@@ -100,8 +100,13 @@ export class SpanWalker extends SyntaxWalker {
     visitChoice(node: ChoiceNode): void {
         const startPos = this.currentPos;
 
+        //for each line of concrete syntax (e.g. #ifdef, #else, and #endif) we
+        // must accumulate an extra newline which was eaten by the compiler
+        if(!node.thenbranch.hidden && node.thenbranch.segments.length > 0) this.currentPos = this.accumulate(this.currentPos, '\n');
         this.visitRegion(node.thenbranch);
+        if(!node.elsebranch.hidden && node.elsebranch.segments.length > 0) this.currentPos = this.accumulate(this.currentPos, '\n');
         this.visitRegion(node.elsebranch);
+        this.currentPos = this.accumulate(this.currentPos, '\n');
 
         node.span = {
             start: startPos,
@@ -468,8 +473,9 @@ export function renderDocument(region: RegionNode): string {
 
 function renderContents(acc: string, node: SegmentNode): string {
     if (node.type === 'choice') {
-        if (!node.thenbranch.hidden) acc = acc + renderDocument(node.thenbranch);
-        if (!node.elsebranch.hidden) acc = acc + renderDocument(node.elsebranch);
+        if (!node.thenbranch.hidden && node.thenbranch.segments.length > 0) acc = acc + '\n' + renderDocument(node.thenbranch);
+        if (!node.elsebranch.hidden && node.elsebranch.segments.length > 0) acc = acc + '\n' + renderDocument(node.elsebranch);
+        acc = acc + '\n';
         return acc;
     }
     else {
@@ -478,21 +484,38 @@ function renderContents(acc: string, node: SegmentNode): string {
 }
 
 export function docToPlainText(region: RegionNode): string {
-    return region.segments.reduce(nodeToPlainText, '');
+    var last;
+    var finalText = '';
+    for(var i = 0; i < region.segments.length; i ++) {
+      var seg = region.segments[i];
+      var text = nodeToPlainText('', seg);
+      //if this segment is right after a choice segment, make sure it begins with a newline
+      if(last && last.type === 'choice' && text[0] != '\n') text = '\n' + text;
+      last = seg;
+      finalText = finalText + text;
+    }
+    return finalText;
 }
 
 export function nodeToPlainText(acc: string, node: SegmentNode): string {
     if (node.type === 'choice') {
         var syntax = ''
-        if (node.kind === 'positive') syntax = '#ifdef';
-        else syntax = '#ifndef'
+        if (node.kind === 'positive') syntax = '\n#ifdef';
+        else syntax = '\n#ifndef'
         syntax = syntax + ' ' + node.name;
 
-        acc = acc + syntax + docToPlainText(node.thenbranch);
+
+        var rest = docToPlainText(node.thenbranch);
+        if(rest[0] != '\n') rest = '\n' + rest;
+
+        acc = acc + syntax + rest
+
         if (node.elsebranch.segments.length > 0) {
-            acc = acc + '#else' + docToPlainText(node.elsebranch);
+            var rest = docToPlainText(node.elsebranch);
+            if(rest[0] != '\n') rest = '\n' + rest;
+            acc = acc + '\n#else' + rest
         }
-        acc = acc + '#endif';
+        acc = acc + '\n#endif';
         return acc;
     }
     else {

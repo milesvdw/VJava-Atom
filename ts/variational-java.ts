@@ -85,6 +85,15 @@ function rangeToSpan(range): Span {
     return span;
 }
 
+function incrementRow(range: [number, number]): [number, number] {
+  return [range[0]+1, range[1]];
+}
+
+function decrementRow(range: [number, number]): [number, number] {
+  return [range[0]-1, range[1]];
+}
+
+
 // ----------------------------------------------------------------------------
 
 // organize this stuff please.
@@ -547,7 +556,7 @@ class VJava {
                     element.classList.add(`insert-alt`);
                     element.classList.add(getelsebranchCssClass(node.name));
 
-                    var elseHiddenMarker = editor.markBufferPosition(node.thenbranch.span.end);
+                    var elseHiddenMarker = editor.markBufferPosition(incrementRow(node.thenbranch.span.end));
                     this.ui.markers.push(elseHiddenMarker);
                     editor.decorateMarker(elseHiddenMarker, { type: 'block', position: 'before', item: element });
                     var vjava = this;
@@ -555,7 +564,7 @@ class VJava {
                         vjava.preserveChanges(editor);
                         var newNode : ContentNode = {
                             type: "text",
-                            content: "\nFill in the second alternative\n"
+                            content: "\nFill in the second alternative"
                         };
                         var inserter = new AlternativeInserter(newNode, thenbranchMarker.getBufferRange().end, "elsebranch", node.name);
                         vjava.doc = inserter.rewriteDocument(vjava.doc);
@@ -604,7 +613,7 @@ class VJava {
                     element.classList.add(`insert-alt`);
                     element.classList.add(getthenbranchCssClass(node.name));
 
-                    var thenHiddenMarker = editor.markBufferPosition(node.elsebranch.span.start);
+                    var thenHiddenMarker = editor.markBufferPosition(decrementRow(node.elsebranch.span.start));
                     this.ui.markers.push(thenHiddenMarker);
                     editor.decorateMarker(thenHiddenMarker, { type: 'block', position: 'before', item: element });
                     var vjava = this;
