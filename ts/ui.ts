@@ -7,15 +7,11 @@ export class NestLevel {
     dimension: ChoiceNode
 }
 
+export type DimensionStatus = "DEF" | "NDEF" | "BOTH"
+
 export class Selector {
     name: string
-    branch: Branch
-}
-
-export class Selection {
-    name: string
-    thenbranch: boolean
-    elsebranch: boolean
+    status: DimensionStatus
 }
 
 export interface Disposable {
@@ -81,18 +77,6 @@ export class VJavaUI {
         this.session.push(dimension);
     }
 
-    updateActiveChoices(dimName: string, branch: Branch): boolean {
-        for (let choice of this.activeChoices) {
-            if (choice.name === dimName) {
-                choice.branch = branch;
-                return;
-            }
-        }
-        //if we didn't find this choice, insert a new one
-        this.activeChoices.push({ name: dimName, branch: branch });
-        return;
-    }
-
     getColorForNode(node: ChoiceNode): string {
         var color;
         //next try the session color set
@@ -154,21 +138,22 @@ export class VJavaUI {
         }
     }
 
-    removeActiveChoice(dimName: string, branch: Branch) {
-        for (var i = 0; i < this.activeChoices.length; i++) {
-            var choice = this.activeChoices[i];
-            if (choice.name === dimName && choice.branch === branch) {
-                this.activeChoices.splice(i, 1);
-                return;
-            }
-        }
-    }
-
-    getChoice(dimName: string): Selector {
+    getSelector(dimName: string): Selector {
         for (let choice of this.activeChoices) {
             if (choice.name === dimName) return choice;
         }
         return null;
+    }
+
+    shouldBeChecked(dimStatus: DimensionStatus, dimName: string) {
+      var selector = this.getSelector(dimName);
+      if(dimStatus === 'DEF') {
+        return (selector && selector.status === dimStatus) ? 'checked' : ''
+      } else if(dimStatus === 'NDEF') {
+        return (selector && selector.status === dimStatus) ? 'checked' : ''
+      } else if(dimStatus === 'BOTH') {
+        return (!selector || selector.status === dimStatus) ? 'checked' : ''
+      }
     }
 }
 

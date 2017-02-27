@@ -1,6 +1,6 @@
 'use babel'
 
-import { Selection, Branch } from './ui';
+import { Selector, Branch } from './ui';
 
 type Pos = [number, number]; // row, column
 
@@ -190,7 +190,7 @@ function copyFromChoice(node: ChoiceNode): ChoiceNode {
 }
 
 export class ViewRewriter extends SyntaxRewriter {
-    constructor(public selections: Selection[]) {
+    constructor(public selections: Selector[]) {
         super();
     }
 
@@ -341,7 +341,7 @@ export class AlternativeInserter extends SyntaxRewriter {
 }
 
 export class EditPreserver extends SyntaxWalker {
-    constructor(public editor: AtomCore.IEditor, public selections: Selection[]) {
+    constructor(public editor: AtomCore.IEditor, public selections: Selector[]) {
         super();
     }
 
@@ -360,29 +360,30 @@ export class EditPreserver extends SyntaxWalker {
     }
 }
 
-export function getSelectionForNode(node: ChoiceNode, selections: Selection[]): Selection {
+export function getSelectionForNode(node: ChoiceNode, selections: Selector[]): Selector {
     return getSelectionForDim(node.name, selections);
 }
 
-export function getSelectionForDim(dimName: string, selections: Selection[]): Selection {
+export function getSelectionForDim(dimName: string, selections: Selector[]): Selector {
     for (var sel of selections) {
         if (sel.name === dimName) return sel;
     }
-    return { name: dimName, thenbranch: true, elsebranch: true };
+    return { name: dimName, status: 'BOTH' };
 }
 
-export function isBranchActive(node, selection: Selection, branch: Branch) {
+export function isBranchActive(node, selection: Selector, branch: Branch) {
     if (selection) {
-        return selection.thenbranch && branch === "thenbranch" && node.kind === "positive"
-            || selection.thenbranch && branch === "elsebranch" && node.kind === "contrapositive"
-            || selection.elsebranch && branch === "elsebranch" && node.kind === "positive"
-            || selection.elsebranch && branch === "thenbranch" && node.kind === "contrapositive"
+        return selection.status === 'BOTH' ||
+            (selection.status === 'DEF' && branch === "thenbranch" && node.kind === "positive"
+            || selection.status === 'DEF' && branch === "elsebranch" && node.kind === "contrapositive"
+            || selection.status === 'NDEF' && branch === "elsebranch" && node.kind === "positive"
+            || selection.status === 'NDEF' && branch === "thenbranch" && node.kind === "contrapositive")
     } else return false;
 }
 
 
 export class DimensionDeleter extends SyntaxRewriter {
-    constructor(public selection: Selection) {
+    constructor(public selection: Selector) {
         super();
     }
 

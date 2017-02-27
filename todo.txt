@@ -1,9 +1,16 @@
+TODO:
+
+-> FEATURE: remove alternative (right click)
 -> BUG: dimension sidebar doesn't show up first time
--> FEATURE: remove alternative
+-> BUG: inserting a new choice messes things up somehow
+-> BUG: can't insert 'when unselected'
+
+DONE:
 
 2/26/2017
 X BUG: adding text at a junction duplicates it
 X BUG: adding text at the end of an alternative doesn't leave whitespace after syntax
+X BUG: alternative selections don't persist in sidebar
 
 2/21/2017
 X BUG: classList undefined error

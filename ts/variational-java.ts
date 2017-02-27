@@ -21,7 +21,7 @@ import {
     EditPreserver, getSelectionForDim, getSelectionForNode, isBranchActive,
     AlternativeInserter
 } from './ast';
-import { VJavaUI, DimensionUI, Branch, Selector, Selection, NestLevel } from './ui'
+import { VJavaUI, DimensionUI, Branch, Selector, NestLevel, DimensionStatus } from './ui'
 
 // ----------------------------------------------------------------------------
 
@@ -124,7 +124,6 @@ class VJava {
 
     styles: {[selector : string] : string} = {}
     nesting: NestLevel[] // a stack represented nested dimensions
-    selections: Selection[]
     ui: VJavaUI
     doc: RegionNode
     raw: string
@@ -252,18 +251,15 @@ class VJava {
 
     addViewListeners(dimension: DimensionUI) {
         $(`#${dimension.name}-view-both`).on('click', () => {
-            this.selectelsebranch(dimension.name);
-            this.selectthenbranch(dimension.name);
+            this.unsetdimension(dimension.name);
         });
 
         $(`#${dimension.name}-view-elsebranch`).on('click', () => {
-            this.unselectthenbranch(dimension.name);
-            this.selectelsebranch(dimension.name);
+            this.setdimensionundefined(dimension.name);
         });
 
         $(`#${dimension.name}-view-thenbranch`).on('click', () => {
-            this.selectthenbranch(dimension.name);
-            this.unselectelsebranch(dimension.name);
+            this.setdimensiondefined(dimension.name);
         });
     }
 
@@ -274,7 +270,7 @@ class VJava {
             this.changeDimColor(dimension, this.doc.segments[i]);
         }
 
-        var preserver: EditPreserver = new EditPreserver(atom.workspace.getActiveTextEditor(), this.selections);
+        var preserver: EditPreserver = new EditPreserver(atom.workspace.getActiveTextEditor(), this.ui.activeChoices);
         preserver.visitRegion(this.doc);
 
         this.updateEditorText(); //TODO find a way to do this without rewriting everything in the editor
@@ -346,15 +342,15 @@ class VJava {
             if (this.nesting.length > 0)  {
                 for (var j = 0; j < this.nesting.length; j++) {
                     //nesting class format: 'nested-[DIM ID]-[BRANCH]-[LEVEL]'
-                    selectors.push('.nested-' + this.nesting[j].selector.name + '-' + this.nesting[j].selector.branch + '-' + j);
-                    var branch: Branch = this.nesting[j].selector.branch;
+                    selectors.push('.nested-' + this.nesting[j].selector.name + '-' + this.nesting[j].selector.status + '-' + j);
+                    var status: DimensionStatus = this.nesting[j].selector.status;
 
                     //pre-shading nest color
                     var nestcolor = this.ui.getColorForNode(this.nesting[j].dimension);
                     var kind = this.nesting[j].dimension.kind;
 
                     //nest in the correct branch color
-                    if ((branch === 'thenbranch' && kind === 'positive') || (branch === 'elsebranch' && kind === 'contrapositive')) nestcolor = shadeColor(nestcolor, .1);
+                    if (status === 'DEF') nestcolor = shadeColor(nestcolor, .1);
                     else nestcolor = shadeColor(nestcolor, -.3);
 
                     nestColors.push(nestcolor);
@@ -391,7 +387,7 @@ class VJava {
             }
 
             //recurse thenbranch and elsebranch
-            var lselector: Selector = { name: node.name, branch: "thenbranch" };
+            var lselector: Selector = { name: node.name, status: (node.kind === 'positive') ? "DEF" : "NDEF" };
             this.nesting.push({ selector: lselector, dimension: node });
             //recurse on thenbranch and elsebranch
             for (var i = 0; i < node.thenbranch.segments.length; i++) {
@@ -399,7 +395,7 @@ class VJava {
             }
             this.nesting.pop();
 
-            var rselector: Selector = { name: node.name, branch: "elsebranch" }
+            var rselector: Selector = { name: node.name, status: (node.kind === 'positive') ? "NDEF" : "DEF" }
             this.nesting.push({ selector: rselector, dimension: node });
             for (var i = 0; i < node.elsebranch.segments.length; i++) {
                 this.setColors(node.elsebranch.segments[i]);
@@ -408,41 +404,14 @@ class VJava {
         }
     }
 
-    toggleDimensionEdit(dimension: DimensionUI, branch: Branch) {
-        var otherbranch;
-        if (branch === 'thenbranch') otherbranch = 'elsebranch';
-        else otherbranch = 'thenbranch';
-
-        //toggle off
-        if ($(`#${dimension.name}-edit-${branch}`).hasClass('edit-enabled')) {
-            $(`#${dimension.name}-edit-${branch}`).removeClass('edit-enabled');
-            $(`#${dimension.name}-edit-${branch}`).addClass('edit-locked');
-            this.ui.removeActiveChoice(dimension.name, branch);
-        } else {
-            //toggle on
-            $(`#${dimension.name}-edit-${branch}`).addClass('edit-enabled');
-            $(`#${dimension.name}-edit-${branch}`).removeClass('edit-locked');
-
-
-            this.ui.updateActiveChoices(dimension.name, branch);
-        }
-        if ($(`#${dimension.name}-edit-${otherbranch}`).hasClass('edit-enabled')) {
-            $(`#${dimension.name}-edit-${otherbranch}`).removeClass('edit-enabled');
-            $(`#${dimension.name}-edit-${otherbranch}`).addClass('edit-locked');
-
-            this.ui.removeActiveChoice(dimension.name, branch);
-        }
-    }
-
-    updateSelections(selection: Selection) {
-        for (let sel of this.selections) {
+    updateSelections(selection: Selector) {
+        for (let sel of this.ui.activeChoices) {
             if (sel.name === selection.name) {
-                sel.thenbranch = selection.thenbranch;
-                sel.elsebranch = selection.elsebranch;
+                sel.status = selection.status;
                 return;
             }
         }
-        this.selections.push(selection);
+        this.ui.activeChoices.push(selection);
     }
 
     //using the list of dimensions contained within the ui object,
@@ -455,22 +424,19 @@ class VJava {
             //and this dimension has not yet been parsed
             if (!this.ui.hasDimension(node.name)) {
 
-                //initialize this dimension for future selection
-                this.updateSelections({ name: node.name, thenbranch: true, elsebranch: true });
-
                 var dimDiv = $(`<div class='form-group dimension-ui-div' id='${node.name}'>
               <a href='' id='removeDimension-${node.name}' class='delete_icon'><img name='removeDimensionImg' border="0" src="${iconsPath}/delete-bin.png" width="16" height="18"/> </a>
               <input type='text' id="${node.name}-colorpicker">
               <h2>${node.name}</h2>
               <br>
               <div class="switch-toggle switch-3 switch-candy">
-                  <input id="${node.name}-view-thenbranch" name="state-${node.name}" type="radio" checked="">
+                  <input id="${node.name}-view-thenbranch" name="state-${node.name}" type="radio" ${this.ui.shouldBeChecked('DEF', node.name)}>
                   <label for="${node.name}-view-thenbranch">DEF</label>
 
-                  <input id="${node.name}-view-both" name="state-${node.name}" type="radio" checked="checked">
+                  <input id="${node.name}-view-both" name="state-${node.name}" type="radio" ${this.ui.shouldBeChecked('BOTH', node.name)}>
                       <label for="${node.name}-view-both">BOTH</label>
 
-                  <input id="${node.name}-view-elsebranch" name="state-${node.name}" type="radio">
+                  <input id="${node.name}-view-elsebranch" name="state-${node.name}" type="radio" ${this.ui.shouldBeChecked('NDEF', node.name)}>
                   <label for="${node.name}-view-elsebranch">NDEF</label>
 
                   <a></a>
@@ -519,20 +485,10 @@ class VJava {
                 });
 
                 this.addViewListeners(dimUIElement);
-
-                //make choice selections if necessary
-                //see if a  choice has been made in this dimension
-                var choice = this.ui.getChoice(node.name);
-
-                var dimUIElement = this.ui.getDimUIElementByName(node.name);
-                //if so, togchoicee the ui appropriately
-                if (choice) { //this implies that a selection a
-                    this.toggleDimensionEdit(dimUIElement, choice.branch);
-                }
             }
 
 
-            if (isBranchActive(node, getSelectionForNode(node, this.selections), "thenbranch") && node.thenbranch.segments.length > 0 && !node.thenbranch.hidden) {
+            if (isBranchActive(node, getSelectionForNode(node, this.ui.activeChoices), "thenbranch") && node.thenbranch.segments.length > 0 && !node.thenbranch.hidden) {
                 //add markers for this new range of a (new or pre-existing) dimension
                 var thenbranchMarker = editor.markBufferRange(node.thenbranch.span, {invalidate: 'surround'});
                 this.ui.markers.push(thenbranchMarker);
@@ -544,8 +500,8 @@ class VJava {
                 var element = document.createElement('div');
 
                 for (var i = this.nesting.length - 1; i >= 0; i--) {
-                    //nesting class format: 'nested-[DIM ID]-[BRANCH]-[LEVEL]'
-                    var nestclass = 'nested-' + this.nesting[i].selector.name + '-' + this.nesting[i].selector.branch + '-' + i;
+                    //nesting class format: 'nested-[DIM ID]-[STATUS]-[LEVEL]'
+                    var nestclass = 'nested-' + this.nesting[i].selector.name + '-' + this.nesting[i].selector.status + '-' + i;
                     editor.decorateMarker(thenbranchMarker, { type: 'line', class: nestclass });
                     element.classList.add(nestclass);
                 }
@@ -577,13 +533,13 @@ class VJava {
                     element.classList.add(getelsebranchCssClass(node.name));
                     this.popupListenerQueue.push({element: element, text: renderDocument(node.elsebranch) });
 
-                    var elseHiddenMarker = editor.markBufferPosition(node.thenbranch.span.end);
+                    var elseHiddenMarker = editor.markBufferPosition(incrementRow(node.thenbranch.span.end));
                     this.ui.markers.push(elseHiddenMarker);
                     editor.decorateMarker(elseHiddenMarker, { type: 'block', position: 'before', item: element });
                     element.onclick = () => { $(`#${node.name}-view-both`).click(); };
                 }
 
-                this.nesting.push({ selector: { name: node.name, branch: "thenbranch" }, dimension: node });
+                this.nesting.push({ selector: { name: node.name, status: (node.kind === 'positive') ? "DEF" : "NDEF" }, dimension: node });
                 //recurse on thenbranch and elsebranch
                 for (var i = 0; i < node.thenbranch.segments.length; i++) {
                     this.renderDimensionUI(editor, node.thenbranch.segments[i]);
@@ -591,7 +547,7 @@ class VJava {
                 this.nesting.pop();
             }
 
-            if (isBranchActive(node, getSelectionForNode(node, this.selections), "elsebranch") && node.elsebranch.segments.length > 0 && !node.elsebranch.hidden) {
+            if (isBranchActive(node, getSelectionForNode(node, this.ui.activeChoices), "elsebranch") && node.elsebranch.segments.length > 0 && !node.elsebranch.hidden) {
 
                 var elsebranchMarker = editor.markBufferRange(node.elsebranch.span, {invalidate: 'surround'});
                 this.ui.markers.push(elsebranchMarker);
@@ -601,7 +557,7 @@ class VJava {
 
                 for (var i = this.nesting.length - 1; i >= 0; i--) {
                     //nesting class format: 'nested-[DIM ID]-[BRANCH]-[LEVEL]'
-                    var nestclass = 'nested-' + this.nesting[i].selector.name + '-' + this.nesting[i].selector.branch + '-' + i;
+                    var nestclass = 'nested-' + this.nesting[i].selector.name + '-' + this.nesting[i].selector.status + '-' + i;
                     editor.decorateMarker(elsebranchMarker, { type: 'line', class: nestclass });
                     element.classList.add(nestclass);
                 }
@@ -613,7 +569,7 @@ class VJava {
                     element.classList.add(`insert-alt`);
                     element.classList.add(getthenbranchCssClass(node.name));
 
-                    var thenHiddenMarker = editor.markBufferPosition(decrementRow(node.elsebranch.span.start));
+                    var thenHiddenMarker = editor.markBufferPosition(node.elsebranch.span.start);
                     this.ui.markers.push(thenHiddenMarker);
                     editor.decorateMarker(thenHiddenMarker, { type: 'block', position: 'before', item: element });
                     var vjava = this;
@@ -642,7 +598,7 @@ class VJava {
                 }
 
 
-                this.nesting.push({ selector: { name: node.name, branch: "elsebranch" }, dimension: node });
+                this.nesting.push({ selector: { name: node.name, status: (node.kind === 'positive') ? "NDEF" : "NDEF" }, dimension: node });
                 for (var i = 0; i < node.elsebranch.segments.length; i++) {
                     this.renderDimensionUI(editor, node.elsebranch.segments[i]);
                 }
@@ -667,7 +623,7 @@ class VJava {
                     $("#" + dimName).remove(); //TODO: can I remove this?
                 }
             }
-            var selection: Selection = getSelectionForDim(dimName, this.selections);
+            var selection: Selector = getSelectionForDim(dimName, this.ui.activeChoices);
             this.deleteDimension(selection);
             this.updateEditorText();
         } else {
@@ -677,7 +633,7 @@ class VJava {
 
     //thenbranch and elsebranch represent whether the thenbranch and elsebranch branches should be promoted
     //a value of 'true' indicates that the content in that branch should be promoted
-    deleteDimension(selection: Selection) {
+    deleteDimension(selection: Selector) {
         //if this is the dimension being promoted, then do that
         this.preserveChanges(atom.workspace.getActiveTextEditor());
         var deleter = new DimensionDeleter(selection);
@@ -704,7 +660,7 @@ class VJava {
     }
 
     preserveChanges(editor: AtomCore.IEditor) {
-        var preserver: EditPreserver = new EditPreserver(editor, this.selections);
+        var preserver: EditPreserver = new EditPreserver(editor, this.ui.activeChoices);
         preserver.visitRegion(this.doc);
     }
 
@@ -733,12 +689,12 @@ class VJava {
     // then a pull with the new selections
     // display both alternatives
     // show the elsebranch alternative
-    selectelsebranch(dimName: string) {
+    setdimensionundefined(dimName: string) {
         var editor = atom.workspace.getActiveTextEditor();
         this.preserveChanges(editor);
-        for (var i = 0; i < this.selections.length; i++) {
-            if (this.selections[i].name === dimName) {
-                this.selections[i].elsebranch = true;
+        for (var i = 0; i < this.ui.activeChoices.length; i++) {
+            if (this.ui.activeChoices[i].name === dimName) {
+                this.ui.activeChoices[i].status = 'NDEF';
             }
         }
         this.updateEditorText();
@@ -746,12 +702,12 @@ class VJava {
     }
 
     // hide the elsebranch alternative
-    unselectelsebranch(dimName: string) {
+    unsetdimension(dimName: string) {
         var editor = atom.workspace.getActiveTextEditor();
         this.preserveChanges(editor);
-        for (var i = 0; i < this.selections.length; i++) {
-            if (this.selections[i].name === dimName) {
-                this.selections[i].elsebranch = false;
+        for (var i = 0; i < this.ui.activeChoices.length; i++) {
+            if (this.ui.activeChoices[i].name === dimName) {
+                this.ui.activeChoices[i].status = 'BOTH';
             }
         }
         this.updateEditorText();
@@ -759,7 +715,7 @@ class VJava {
 
     updateEditorText() {
         var editor = atom.workspace.getActiveTextEditor();
-        var showDoc = new ViewRewriter(this.selections).rewriteDocument(this.doc);
+        var showDoc = new ViewRewriter(this.ui.activeChoices).rewriteDocument(this.doc);
         editor.setText(renderDocument(showDoc));
 
         for(var marker of this.ui.markers) {
@@ -782,25 +738,12 @@ class VJava {
     }
 
     // show the thenbranch alternative
-    selectthenbranch(dimName: string) {
+    setdimensiondefined(dimName: string) {
         var editor = atom.workspace.getActiveTextEditor();
         this.preserveChanges(editor);
-        for (var i = 0; i < this.selections.length; i++) {
-            if (this.selections[i].name === dimName) {
-                this.selections[i].thenbranch = true;
-            }
-        }
-
-        this.updateEditorText();
-    }
-
-    // hide the thenbranch alternative
-    unselectthenbranch(dimName: string) {
-        var editor = atom.workspace.getActiveTextEditor();
-        this.preserveChanges(editor);
-        for (var i = 0; i < this.selections.length; i++) {
-            if (this.selections[i].name === dimName) {
-                this.selections[i].thenbranch = false;
+        for (var i = 0; i < this.ui.activeChoices.length; i++) {
+            if (this.ui.activeChoices[i].name === dimName) {
+                this.ui.activeChoices[i].status = 'DEF';
             }
         }
 
@@ -816,8 +759,6 @@ class VJava {
         this.ui.menuItems = [];
         this.popupListenerQueue = [];
         this.tooltips = new CompositeDisposable();
-
-        this.selections = !$.isEmptyObject({}) ? state : [];
 
         var activeEditor = atom.workspace.getActiveTextEditor();
 
