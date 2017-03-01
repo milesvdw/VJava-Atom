@@ -1,11 +1,16 @@
 TODO:
-
+-> FEATURE: filter dimension sidebar
 -> FEATURE: remove alternative (right click)
+-> FEATURE: support multiple editing windows
 -> BUG: dimension sidebar doesn't show up first time
--> BUG: inserting a new choice messes things up somehow
--> BUG: can't insert 'when unselected'
+
+-> BUG: 'insert alternate alternative' button for else branches isn't attached quite right.
 
 DONE:
+
+2/28/2017
+X BUG: can't insert 'when unselected'
+X BUG: inserting a new choice messes things up somehow
 
 2/26/2017
 X BUG: adding text at a junction duplicates it

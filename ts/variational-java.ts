@@ -463,9 +463,9 @@ class VJava {
                     }]
                 }
                 var whenSelectedSub = {};
-                whenSelectedSub[`variational-java:add-choice-segment-${node.name}-selected`] = () => this.addChoiceSegment(node.name, "thenbranch");
+                whenSelectedSub[`variational-java:add-choice-segment-${node.name}-selected`] = () => this.addChoiceSegment(node.name, "DEF");
                 var whenUnselectedSub = {};
-                whenUnselectedSub[`variational-java:add-choice-segment-${node.name}-unselected`] = () => this.addChoiceSegment(node.name, "elsebranch");
+                whenUnselectedSub[`variational-java:add-choice-segment-${node.name}-unselected`] = () => this.addChoiceSegment(node.name, "NDEF");
 
                 this.subscriptions.add(atom.commands.add('atom-text-editor', whenSelectedSub));
                 this.subscriptions.add(atom.commands.add('atom-text-editor', whenUnselectedSub));
@@ -577,9 +577,9 @@ class VJava {
                         vjava.preserveChanges(editor);
                         var newNode : ContentNode = {
                             type: "text",
-                            content: "Fill in the second alternative"
+                            content: "\nFill in the second alternative"
                         };
-                        var inserter = new AlternativeInserter(newNode, elsebranchMarker.getBufferRange().end, "thenbranch", node.name);
+                        var inserter = new AlternativeInserter(newNode, elsebranchMarker.getBufferRange().start, "thenbranch", node.name);
                         vjava.doc = inserter.rewriteDocument(vjava.doc);
                         vjava.updateEditorText();
                     };
@@ -834,7 +834,7 @@ class VJava {
         return {session: ses, dimensions: dims, activeChoices: this.ui.activeChoices};
     }
 
-    addChoiceSegment(dim: string, branch: Branch) {
+    addChoiceSegment(dim: string, status: DimensionStatus) {
 
         var activeEditor = atom.workspace.getActiveTextEditor();
 
@@ -847,19 +847,18 @@ class VJava {
         var node: ChoiceNode = {
             span: null, // we don't know what it's span will be
             name: dim,
-            kind: null,
+            kind: status === 'DEF' ? 'positive' : 'contrapositive', // NOTE that in this case, status must either be 'DEF' or 'NDEF',
+                                                                    // and in fact cannot be 'BOTH' (enforced only by convention at usage sites)
             type: 'choice',
             thenbranch: { segments: [], type: "region" },
             elsebranch: { segments: [], type: "region" }
         }
-        if (branch == "thenbranch") node.kind = "positive";
-        else node.kind = "contrapositive";
 
-        node[branch].segments = [
+        node.thenbranch.segments = [
             {
                 span: null, //no idea what this will be
                 marker: null,// do this later?
-                content: '\n' + lit + '\n',
+                content: '\n' + lit,
                 type: 'text'
             }
         ];
