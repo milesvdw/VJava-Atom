@@ -200,12 +200,12 @@ class VJava {
                     <h2>${dimName}</h2
                     <br>
                     <div class="switch-toggle switch-3 switch-candy">
+                        <input id="${dimName}-view-both" name="state-${dimName}" type="radio" checked="checked">
+                        <label for="${dimName}-view-both">BOTH</label>
+                        <br>
                         <input id="${dimName}-view-thenbranch" name="state-${dimName}" type="radio" checked="">
                         <label for="${dimName}-view-thenbranch">DEF</label>
-
-                        <input id="${dimName}-view-both" name="state-${dimName}" type="radio" checked="checked">
-                            <label for="${dimName}-view-both">BOTH</label>
-
+                        <br>
                         <input id="${dimName}-view-elsebranch" name="state-${dimName}" type="radio">
                         <label for="${dimName}-view-elsebranch">NDEF</label>
                     </div>
@@ -245,6 +245,9 @@ class VJava {
                 });
 
                 this.ui.dimensions.push(dimension);
+
+                // default new dimensions to show both branches
+                this.ui.activeChoices.push({name: dimension.name, status: 'BOTH'});
             });
         });
     }
@@ -423,6 +426,15 @@ class VJava {
 
             //and this dimension has not yet been parsed
             if (!this.ui.hasDimension(node.name)) {
+              var previousSelection = false;
+              for (var i = 0; i < this.ui.activeChoices.length; i++) {
+                  if (this.ui.activeChoices[i].name === node.name) {
+                    previousSelection = true;
+                    break;
+                  }
+              }
+              // default the selection to 'BOTH' if none has been made
+              if(!previousSelection) this.ui.activeChoices.push({name: node.name, status: 'BOTH'});
 
                 var dimDiv = $(`<div class='form-group dimension-ui-div' id='${node.name}'>
               <a href='' id='removeDimension-${node.name}' class='delete_icon'><img name='removeDimensionImg' border="0" src="${iconsPath}/delete-bin.png" width="16" height="18"/> </a>
@@ -430,13 +442,14 @@ class VJava {
               <h2>${node.name}</h2>
               <br>
               <div class="switch-toggle switch-3 switch-candy">
-                  <input id="${node.name}-view-thenbranch" name="state-${node.name}" type="radio" ${this.ui.shouldBeChecked('DEF', node.name)}>
+
+                  <input id="${node.name}-view-both" name="state-${node.name}" type="radio" ${this.ui.shouldBeChecked('BOTH', node.name)} >
+                  <label for="${node.name}-view-both">BOTH</label>
+                  <br>
+                  <input id="${node.name}-view-thenbranch" name="state-${node.name}" type="radio" ${this.ui.shouldBeChecked('DEF', node.name)} >
                   <label for="${node.name}-view-thenbranch">DEF</label>
-
-                  <input id="${node.name}-view-both" name="state-${node.name}" type="radio" ${this.ui.shouldBeChecked('BOTH', node.name)}>
-                      <label for="${node.name}-view-both">BOTH</label>
-
-                  <input id="${node.name}-view-elsebranch" name="state-${node.name}" type="radio" ${this.ui.shouldBeChecked('NDEF', node.name)}>
+                  <br>
+                  <input id="${node.name}-view-elsebranch" name="state-${node.name}" type="radio" ${this.ui.shouldBeChecked('NDEF', node.name)} >
                   <label for="${node.name}-view-elsebranch">NDEF</label>
 
                   <a></a>
@@ -506,7 +519,7 @@ class VJava {
                     element.classList.add(nestclass);
                 }
 
-                if (node.elsebranch.segments.length == 0) {
+                if (node.elsebranch.segments.length == 0 && node.elsebranch.hidden == false) {
                     element.textContent = '(+)';
                     element.classList.add(`insert-alt-${node.name}`);
                     element.classList.add(`insert-alt`);
@@ -526,7 +539,7 @@ class VJava {
                         vjava.doc = inserter.rewriteDocument(vjava.doc);
                         vjava.updateEditorText();
                     };
-                } else if (node.elsebranch.hidden) {
+                } else if (node.elsebranch.hidden && node.elsebranch.segments.length > 0) {
                     element.textContent = '(...)';
                     element.classList.add(`hover-alt-${node.name}`);
                     element.classList.add(`hover-alt`);
@@ -563,7 +576,7 @@ class VJava {
                 }
 
 
-                if (node.thenbranch.segments.length == 0) {
+                if (node.thenbranch.segments.length == 0 && node.thenbranch.hidden == false) {
                     element.textContent = '(+)';
                     element.classList.add(`insert-alt-${node.name}`);
                     element.classList.add(`insert-alt`);
@@ -583,7 +596,7 @@ class VJava {
                         vjava.doc = inserter.rewriteDocument(vjava.doc);
                         vjava.updateEditorText();
                     };
-                } else if (node.thenbranch.hidden) {
+                } else if (node.thenbranch.hidden && node.thenbranch.segments.length > 0) {
                     element.textContent = '(...)';
                     element.classList.add(`hover-alt-${node.name}`);
                     element.classList.add(`hover-alt`);

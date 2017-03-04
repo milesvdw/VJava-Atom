@@ -172,7 +172,8 @@ abstract class SyntaxRewriter {
 
         const region: RegionNode = {
             type: "region",
-            segments: rewrittenNodes
+            segments: rewrittenNodes,
+            hidden: false
         };
 
         return region;
@@ -294,7 +295,7 @@ export class AlternativeInserter extends SyntaxRewriter {
                 segments: [this.altNode]
             }
             newthenbranch = super.rewriteRegion(node.thenbranch);
-        } else if(this.branch === "thenbranch" 
+        } else if(this.branch === "thenbranch"
             && node.thenbranch.span.end[0] === this.location.row && node.thenbranch.span.end[1] === this.location.column && node.name === this.dimension) {
             if(node.thenbranch.segments.length != 0) throw "This alternative already exists";
             else newthenbranch = {
