@@ -35,6 +35,7 @@ export class VJavaUI {
     message: JQuery;
     activeChoices: Selector[];
     markers: AtomCore.IDisplayBufferMarker[];
+    regionMarkers: AtomCore.IDisplayBufferMarker[];
     contextMenu: Disposable;
     menuItems: MenuItem[]
 

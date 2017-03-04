@@ -276,8 +276,8 @@ class VJava {
             this.changeDimColor(dimension, this.doc.segments[i]);
         }
 
-        var preserver: EditPreserver = new EditPreserver(atom.workspace.getActiveTextEditor(), this.ui.activeChoices);
-        preserver.visitRegion(this.doc);
+        var preserver: EditPreserver = new EditPreserver(atom.workspace.getActiveTextEditor(), this.ui.activeChoices, this.ui.regionMarkers);
+        preserver.visitDocument(this.doc);
 
         this.updateEditorText(); //TODO find a way to do this without rewriting everything in the editor
     }
@@ -507,7 +507,7 @@ class VJava {
             if (isBranchActive(node, getSelectionForNode(node, this.ui.activeChoices), "thenbranch") && node.thenbranch.segments.length > 0 && !node.thenbranch.hidden) {
                 //add markers for this new range of a (new or pre-existing) dimension
                 var thenbranchMarker = editor.markBufferRange(node.thenbranch.span, {invalidate: 'surround'});
-                this.ui.markers.push(thenbranchMarker);
+                this.ui.regionMarkers.push(thenbranchMarker);
 
                 //decorate with the appropriate css classes
                 editor.decorateMarker(thenbranchMarker, { type: 'line', class: getthenbranchCssClass(node.name) });
@@ -566,7 +566,7 @@ class VJava {
             if (isBranchActive(node, getSelectionForNode(node, this.ui.activeChoices), "elsebranch") && node.elsebranch.segments.length > 0 && !node.elsebranch.hidden) {
 
                 var elsebranchMarker = editor.markBufferRange(node.elsebranch.span, {invalidate: 'surround'});
-                this.ui.markers.push(elsebranchMarker);
+                this.ui.regionMarkers.push(elsebranchMarker);
 
                 var element = document.createElement('div');
                 editor.decorateMarker(elsebranchMarker, { type: 'line', class: getelsebranchCssClass(node.name) });
@@ -623,7 +623,9 @@ class VJava {
 
 
         } else {
-            node.marker = editor.markBufferRange(node.span, {invalidate: 'surround'});
+            var m = editor.markBufferRange(node.span, {invalidate: 'surround'});
+            this.ui.markers.push(m);
+            node.marker = m;
         }
     }
 
@@ -676,8 +678,8 @@ class VJava {
     }
 
     preserveChanges(editor: AtomCore.IEditor) {
-        var preserver: EditPreserver = new EditPreserver(editor, this.ui.activeChoices);
-        preserver.visitRegion(this.doc);
+        var preserver: EditPreserver = new EditPreserver(editor, this.ui.activeChoices, this.ui.regionMarkers);
+        preserver.visitDocument(this.doc);
     }
 
     parseVJava(textContents: string, next: () => void) {
@@ -738,6 +740,7 @@ class VJava {
             marker.destroy();
         }
         this.ui.markers = [];
+        this.ui.regionMarkers = [];
 
         this.tooltips.dispose();
 

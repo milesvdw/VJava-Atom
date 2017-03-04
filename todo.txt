@@ -1,17 +1,20 @@
 TODO:
 -> FEATURE: filter dimension sidebar
--> FEATURE: remove alternative
+
 -> FEATURE: support multiple editing windows
 -> BUG: dimension sidebar doesn't show up first time
 -> TWEAK: remove blank lines at the beginning of choices
+-> QUESTION: what should happen when the users 'deletes' a choice while one of the alternatives is hidden?
 
 DONE:
+
 3/3/2017
 X BUG: 'insert alternate alternative' button for else branches isn't attached quite right.
 X TWEAK: stack radio buttons vertically
 X TWEAK: reorder radio buttons
 X TWEAK: (+) filtered out appropriately
 X BUG: filtering not doing anything
+X FEATURE: remove alternative
 
 2/28/2017
 X BUG: can't insert 'when unselected'

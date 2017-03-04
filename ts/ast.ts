@@ -28,6 +28,7 @@ export interface ChoiceNode {
     kind: ChoiceKind;
     span?: Span;
     marker?: AtomCore.IDisplayBufferMarker;
+    delete?: boolean;
 }
 
 export interface RegionNode {
@@ -44,6 +45,10 @@ export type SegmentNode = ContentNode | ChoiceNode;
  * Call the base method in your override to continue traversal through a node's children.
  */
 export abstract class SyntaxWalker {
+    visitDocument(doc: RegionNode): void {
+      this.visitRegion(doc);
+    }
+
     visitContent(node: ContentNode): void { }
 
     visitChoice(node: ChoiceNode): void {
@@ -342,22 +347,109 @@ export class AlternativeInserter extends SyntaxRewriter {
 }
 
 export class EditPreserver extends SyntaxWalker {
-    constructor(public editor: AtomCore.IEditor, public selections: Selector[]) {
+    index: number;
+
+      constructor(public editor: AtomCore.IEditor, public selections: Selector[],
+        public regionMarkers: AtomCore.IDisplayBufferMarker[]) {
         super();
+    }
+
+    visitDocument(doc: RegionNode): void {
+      this.index = -1;
+      this.visitRegion(doc);
     }
 
     visitContent(node: ContentNode): void {
         node.content = this.editor.getTextInBufferRange(node.marker.getBufferRange());
     }
 
+    visitRegion(region: RegionNode): void {
+        //first visit each node in the region
+        for (const node of region.segments) {
+            switch (node.type) {
+                case "text":
+                    this.visitContent(node);
+                    break;
+                case "choice":
+                    this.visitChoice(node);
+                    break;
+            }
+        }
+        //then look for nodes which have been marked for deletion (null)
+        for(var i = 0; i < region.segments.length; i ++) {
+          if(region.segments[i].type == 'choice' && (region.segments[i] as ChoiceNode).delete) {
+            region.segments.splice(i, 1);
+          }
+        }
+    }
+
     visitChoice(node: ChoiceNode): void {
+        var recurseThen = false;
+        var recurseElse = false;
         var selection = getSelectionForNode(node, this.selections);
         if (isBranchActive(node, selection, "thenbranch") && !node.thenbranch.hidden) {
-            this.visitRegion(node.thenbranch);
+            this.index += 1;
+            var subsumed = false;
+            //if the marker hasn't been invalidated, then we're good to go.
+            if(this.regionMarkers[this.index].isValid()) {
+              recurseThen = true;
+            } else {
+              //on the other hand, if the marker was invalidated, we need to seriously modify this node
+
+              //if the this-branch of a positive node was destroyed but the else-branch wasn't
+              //make the node a contrapositive node, and
+              //use the old else-branch as the new then-branch
+              if((node.elsebranch.segments.length > 0) && this.regionMarkers[this.index+1].isValid() || node.elsebranch.hidden) {
+                if(node.kind === 'positive') {
+                  node.kind = 'contrapositive';
+                  node.thenbranch = {segments: node.elsebranch.segments, type: 'region'}
+                  node.elsebranch.segments = [];
+                } else if(node.kind === 'contrapositive') {
+                  //and vice versa
+                  node.kind = 'positive';
+                  node.thenbranch = {segments: node.elsebranch.segments, type: 'region'}
+                  node.elsebranch.segments = [];
+                }
+                //increment if the other branch that was just subsumed *wasn't* hidden
+                if(node.elsebranch.hidden == false) this.index += 1;
+
+                //then recurse on the now-then-branch
+                recurseThen = true;
+              } else {
+                //in the case where both alternatives were shown, and neither marker is valid
+                //the user has attempted to delete this entire choice node, so we mark is as null, for deletion
+                node.delete = true;
+
+              }
+
+              subsumed = true; // subsumed is true because in any case, we no longer need to look at the else-branch
+              this.index += 1;
+
+            }
         }
-        if (isBranchActive(node, selection, "elsebranch") && !node.elsebranch.hidden) {
-            this.visitRegion(node.elsebranch);
+        if (isBranchActive(node, selection, "elsebranch") && !subsumed && (node.elsebranch.segments.length > 0) && !node.elsebranch.hidden) {
+            this.index += 1;
+            //if the marker hasn't been invalidated, then we're good to go.
+            if(this.regionMarkers[this.index].isValid()) {
+              recurseElse = true;
+            } else {
+              //on the other hand, if the marker was invalidated, we need to seriously modify this node
+
+              //if the else-branch of a positive node was destroyed but the then-branch wasn't
+              //simply make this a single-alternative node
+              if(this.regionMarkers[this.index].isValid() || node.thenbranch.hidden) {
+                node.elsebranch.segments = [];
+              } else {
+                //in the case where both alternatives were shown, and neither marker is valid
+                //the user has attempted to delete this entire choice node, so we mark it for deletion
+                node.delete = true;
+              }
+
+
+            }
         }
+        if(recurseThen) this.visitRegion(node.thenbranch);
+        if(recurseElse) this.visitRegion(node.elsebranch);
     }
 }
 
