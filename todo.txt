@@ -1,12 +1,17 @@
 TODO:
 -> FEATURE: filter dimension sidebar
--> FEATURE: remove alternative (right click)
+-> FEATURE: remove alternative
 -> FEATURE: support multiple editing windows
 -> BUG: dimension sidebar doesn't show up first time
-
 -> BUG: 'insert alternate alternative' button for else branches isn't attached quite right.
+-> TWEAK: remove blank lines at the beginning of choices
+
+-> TWEAK: (+) filtered out appropriately
 
 DONE:
+3/3/2017
+X TWEAK: stack radio buttons vertically
+X TWEAK: reorder radio buttons
 
 2/28/2017
 X BUG: can't insert 'when unselected'
