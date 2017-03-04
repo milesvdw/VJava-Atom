@@ -3,12 +3,11 @@ TODO:
 -> FEATURE: remove alternative
 -> FEATURE: support multiple editing windows
 -> BUG: dimension sidebar doesn't show up first time
--> BUG: 'insert alternate alternative' button for else branches isn't attached quite right.
-
 -> TWEAK: remove blank lines at the beginning of choices
 
 DONE:
 3/3/2017
+X BUG: 'insert alternate alternative' button for else branches isn't attached quite right.
 X TWEAK: stack radio buttons vertically
 X TWEAK: reorder radio buttons
 X TWEAK: (+) filtered out appropriately

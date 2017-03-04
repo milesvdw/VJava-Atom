@@ -88,6 +88,9 @@ function rangeToSpan(range): Span {
 function incrementRow(range: [number, number]): [number, number] {
   return [range[0]+1, range[1]];
 }
+function incrementCol(range: [number, number]): [number, number] {
+  return [range[0], range[1] +1];
+}
 
 function decrementRow(range: [number, number]): [number, number] {
   return [range[0]-1, range[1]];
@@ -525,9 +528,9 @@ class VJava {
                     element.classList.add(`insert-alt`);
                     element.classList.add(getelsebranchCssClass(node.name));
 
-                    var elseHiddenMarker = editor.markBufferPosition(incrementRow(node.thenbranch.span.end));
+                    var elseHiddenMarker = editor.markBufferPosition(node.thenbranch.span.end);
                     this.ui.markers.push(elseHiddenMarker);
-                    editor.decorateMarker(elseHiddenMarker, { type: 'block', position: 'before', item: element });
+                    editor.decorateMarker(elseHiddenMarker, { type: 'block', position: 'after', item: element });
                     var vjava = this;
                     element.onclick = () => {
                         vjava.preserveChanges(editor);
@@ -546,9 +549,9 @@ class VJava {
                     element.classList.add(getelsebranchCssClass(node.name));
                     this.popupListenerQueue.push({element: element, text: renderDocument(node.elsebranch) });
 
-                    var elseHiddenMarker = editor.markBufferPosition(incrementRow(node.thenbranch.span.end));
+                    var elseHiddenMarker = editor.markBufferPosition(node.thenbranch.span.end);
                     this.ui.markers.push(elseHiddenMarker);
-                    editor.decorateMarker(elseHiddenMarker, { type: 'block', position: 'before', item: element });
+                    editor.decorateMarker(elseHiddenMarker, { type: 'block', position: 'after', item: element });
                     element.onclick = () => { $(`#${node.name}-view-both`).click(); };
                 }
 
