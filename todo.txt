@@ -1,12 +1,14 @@
 TODO:
 -> FEATURE: filter dimension sidebar
-
 -> FEATURE: support multiple editing windows
 -> BUG: dimension sidebar doesn't show up first time
 -> TWEAK: remove blank lines at the beginning of choices
 -> QUESTION: what should happen when the users 'deletes' a choice while one of the alternatives is hidden?
 
 DONE:
+
+3/4/2017
+X BUG: can't remove only one part of a choice
 
 3/3/2017
 X BUG: 'insert alternate alternative' button for else branches isn't attached quite right.

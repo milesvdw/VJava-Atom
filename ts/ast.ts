@@ -437,7 +437,7 @@ export class EditPreserver extends SyntaxWalker {
 
               //if the else-branch of a positive node was destroyed but the then-branch wasn't
               //simply make this a single-alternative node
-              if(this.regionMarkers[this.index].isValid() || node.thenbranch.hidden) {
+              if(this.regionMarkers[this.index-1].isValid() || node.thenbranch.hidden) {
                 node.elsebranch.segments = [];
               } else {
                 //in the case where both alternatives were shown, and neither marker is valid
