@@ -198,8 +198,7 @@ class VJava {
                 nameDiv.remove();
 
                 var dimDiv = $(`<div class='form-group dimension-ui-div' id='${dimName}'>
-                    <a href='' id='removeDimension-${dimName}'><img id='removeDimensionImg' class='delete_icon' border="0" src="${iconsPath}/delete-bin.png" width="16" height="18"/> </a>
-                    <input class="jscolor" id="${dimName}-colorpicker" value="ab2567">
+                    <input class="colorpicker" id="${dimName}-colorpicker" value="ab2567">
                     <h2>${dimName}</h2
                     <br>
                     <div class="switch-toggle switch-3 switch-candy">
@@ -212,6 +211,7 @@ class VJava {
                         <input id="${dimName}-view-elsebranch" name="state-${dimName}" type="radio">
                         <label for="${dimName}-view-elsebranch">NDEF</label>
                     </div>
+                    <a href='' id='removeDimension-${dimName}'><img id='removeDimensionImg' class='delete_icon' border="0" src="${iconsPath}/delete-bin.png" width="16" height="18"/> </a>
                     <br></div>`);
                 this.ui.main.append(dimDiv);
 
@@ -440,8 +440,7 @@ class VJava {
               if(!previousSelection) this.ui.activeChoices.push({name: node.name, status: 'BOTH'});
 
                 var dimDiv = $(`<div class='form-group dimension-ui-div' id='${node.name}'>
-              <a href='' id='removeDimension-${node.name}' class='delete_icon'><img name='removeDimensionImg' border="0" src="${iconsPath}/delete-bin.png" width="16" height="18"/> </a>
-              <input type='text' id="${node.name}-colorpicker">
+              <input class='colorpicker' type='text' id="${node.name}-colorpicker">
               <h2>${node.name}</h2>
               <br>
               <div class="switch-toggle switch-3 switch-candy">
@@ -457,6 +456,7 @@ class VJava {
 
                   <a></a>
               </div>
+              <a href='' id='removeDimension-${node.name}' class='delete_icon'><img name='removeDimensionImg' border="0" src="${iconsPath}/delete-bin.png" width="16" height="18"/> </a>
               <br></div>  `);
                 this.ui.main.append(dimDiv);
 
