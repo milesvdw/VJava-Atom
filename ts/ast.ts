@@ -92,14 +92,15 @@ export class SpanWalker extends SyntaxWalker {
     }
 
     visitContent(node: ContentNode): void {
-        const endPos = this.accumulate(this.currentPos, node.content);
+      //.slice(0, -1)
+        const endPos = this.accumulate(this.currentPos, node.content.slice(0, -1)); //put the end marker before the final newline
 
         node.span = {
             start: this.currentPos,
             end: endPos
         };
 
-        this.currentPos = endPos;
+        this.currentPos = this.accumulate(endPos, '\n');
     }
 
     visitChoice(node: ChoiceNode): void {
@@ -107,11 +108,8 @@ export class SpanWalker extends SyntaxWalker {
 
         //for each line of concrete syntax (e.g. #ifdef, #else, and #endif) we
         // must accumulate an extra newline which was eaten by the compiler
-        if(!node.thenbranch.hidden && node.thenbranch.segments.length > 0) this.currentPos = this.accumulate(this.currentPos, '\n');
         this.visitRegion(node.thenbranch);
-        if(!node.elsebranch.hidden && node.elsebranch.segments.length > 0) this.currentPos = this.accumulate(this.currentPos, '\n');
         this.visitRegion(node.elsebranch);
-        this.currentPos = this.accumulate(this.currentPos, '\n');
 
         node.span = {
             start: startPos,
@@ -567,9 +565,8 @@ export function renderDocument(region: RegionNode): string {
 
 function renderContents(acc: string, node: SegmentNode): string {
     if (node.type === 'choice') {
-        if (!node.thenbranch.hidden && node.thenbranch.segments.length > 0) acc = acc + '\n' + renderDocument(node.thenbranch);
-        if (!node.elsebranch.hidden && node.elsebranch.segments.length > 0) acc = acc + '\n' + renderDocument(node.elsebranch);
-        acc = acc + '\n';
+        if (!node.thenbranch.hidden && node.thenbranch.segments.length > 0) acc = acc + renderDocument(node.thenbranch);
+        if (!node.elsebranch.hidden && node.elsebranch.segments.length > 0) acc = acc + renderDocument(node.elsebranch);
         return acc;
     }
     else {
@@ -594,8 +591,8 @@ export function docToPlainText(region: RegionNode): string {
 export function nodeToPlainText(acc: string, node: SegmentNode): string {
     if (node.type === 'choice') {
         var syntax = ''
-        if (node.kind === 'positive') syntax = '\n#ifdef';
-        else syntax = '\n#ifndef'
+        if (node.kind === 'positive') syntax = '#ifdef';
+        else syntax = '#ifndef'
         syntax = syntax + ' ' + node.name;
 
 
@@ -607,12 +604,12 @@ export function nodeToPlainText(acc: string, node: SegmentNode): string {
         if (node.elsebranch.segments.length > 0) {
             var rest = docToPlainText(node.elsebranch);
             if(rest[0] != '\n') rest = '\n' + rest;
-            acc = acc + '\n#else' + rest
+            acc = acc + '#else' + rest
         }
-        acc = acc + '\n#endif';
+        acc = acc + '#endif';
         return acc;
     }
     else {
-        return acc + node.content
+        return acc + node.content + '\n'; //replace the newline that we omitted from the range
     }
 }
