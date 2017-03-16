@@ -91,6 +91,7 @@ export class SpanWalker extends SyntaxWalker {
         return endPos;
     }
 
+
     visitContent(node: ContentNode): void {
       //.slice(0, -1)
         const endPos = this.accumulate(this.currentPos, node.content.slice(0, -1)); //put the end marker before the final newline
@@ -100,21 +101,35 @@ export class SpanWalker extends SyntaxWalker {
             end: endPos
         };
 
-        this.currentPos = this.accumulate(endPos, '\n');
+        this.currentPos = endPos;
     }
 
     visitChoice(node: ChoiceNode): void {
+        //this will have been right after a content node, so accumulate a newline to differentiate the two
+        this.currentPos = this.accumulate(this.currentPos, '\n');
+
         const startPos = this.currentPos;
 
         //for each line of concrete syntax (e.g. #ifdef, #else, and #endif) we
         // must accumulate an extra newline which was eaten by the compiler
         this.visitRegion(node.thenbranch);
+
+        //if we visited anything in the thenbranch, we need to accumulate a newline b/c the last of those was a text node
+        if(node.thenbranch.segments.length > 0 && !node.thenbranch.hidden) {
+            this.currentPos = this.accumulate(this.currentPos, '\n');
+        }
+
         this.visitRegion(node.elsebranch);
 
         node.span = {
             start: startPos,
             end: this.currentPos
         };
+
+        //if we visited anything in the elsebranch, we need to accumulate a newline b/c the last of those was a text node
+        if(node.elsebranch.segments.length > 0 && !node.elsebranch.hidden) {
+            this.currentPos = this.accumulate(this.currentPos, '\n');
+        }
     }
 
     visitRegion(node: RegionNode): void {
@@ -208,6 +223,7 @@ export class ViewRewriter extends SyntaxRewriter {
         //see if this alternative should be displayed
         if (isBranchActive(node, getSelectionForNode(node, this.selections), "thenbranch")) {
             newNode.thenbranch = this.rewriteRegion(node.thenbranch);
+
         } else {
             newNode.thenbranch = Object.assign({}, node.thenbranch);
             newNode.thenbranch.hidden = true;

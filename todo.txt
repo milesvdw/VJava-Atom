@@ -4,14 +4,15 @@ TODO:
 -> BUG: dimension sidebar doesn't show up first time
 -> QUESTION: what should happen when the users 'deletes' a choice while one of the alternatives is hidden?
 -> BUG: delete choices with only one alternative doesn't remove (+) button
--> BUG: insert nested dimension doing nothing
--> BUG: can't insert text at the first line of the outer dimension when an inner dimension starts immediately
+-> BUG: insert nested dimension breaks everything
+
 
 
 
 DONE:
 3/11/2017
 X VETOED: remove blank lines at the beginning of choices
+X BUG: can't insert text at the first line of the outer dimension when an inner dimension starts immediately
 
 3/10/2017
 X TWEAK: rearrange UI elements
