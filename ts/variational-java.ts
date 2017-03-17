@@ -35,6 +35,10 @@ declare global {
             contextMenu: any;
         }
 
+        interface IDisplayBufferMarker {
+            onDidDestroy(cb: Function) : void
+        }
+
         interface IKeymapManager {
             keyBindings: any;
         }
@@ -69,12 +73,12 @@ if (!Array.prototype.last) {
 
 //declared out here so that they may be accessed from the document itself
 //only for debugging purposes.
-function getthenbranchCssClass(dimName) {
-    return 'dimension-marker-' + dimName + "-thenbranch";
+function getdefbranchCssClass(dimName) {
+    return 'dimension-marker-' + dimName + "-defbranch";
 }
 
-function getelsebranchCssClass(dimName) {
-    return 'dimension-marker-' + dimName + "-elsebranch";
+function getndefbranchCssClass(dimName) {
+    return 'dimension-marker-' + dimName + "-ndefbranch";
 }
 
 function rangeToSpan(range): Span {
@@ -130,6 +134,7 @@ class VJava {
     ui: VJavaUI
     doc: RegionNode
     raw: string
+    addChoiceLockout: boolean = false
     popupListenerQueue: { element : HTMLElement, text: string }[]
     colorpicker: {}
     dimensionColors: {}
@@ -325,22 +330,12 @@ class VJava {
         if (node.type === 'choice') {
             var color = this.ui.getColorForNode(node);
 
-            //find the color for the thenbranch alternative
-            if (node.kind === 'positive') {
-                var thenbranchcolor = shadeColor(color, .1);
-                var thenbranchcursorcolor = shadeColor(color, .2);
-                var thenbranchhighlightcolor = shadeColor(color, .3);
-                var elsebranchcolor = shadeColor(color, -.3);
-                var elsebranchcursorcolor = shadeColor(color, -.2);
-                var elsebranchhighlightcolor = shadeColor(color, -.1);
-            } else {
-                var thenbranchcursorcolor = shadeColor(color, -.2);
-                var thenbranchhighlightcolor = shadeColor(color, -.1);
-                var thenbranchcolor = shadeColor(color, -.3);
-                var elsebranchcolor = shadeColor(color, .1);
-                var elsebranchcursorcolor = shadeColor(color, .2);
-                var elsebranchhighlightcolor = shadeColor(color, .3);
-            }
+            var defbranchcolor = shadeColor(color, .1);
+            var defbranchcursorcolor = shadeColor(color, .2);
+            var defbranchhighlightcolor = shadeColor(color, .3);
+            var ndefbranchcolor = shadeColor(color, -.3);
+            var ndefbranchcursorcolor = shadeColor(color, -.2);
+            var ndefbranchhighlightcolor = shadeColor(color, -.1);
 
             var selectors = [];
             var nestColors = [];
@@ -356,8 +351,8 @@ class VJava {
                     var kind = this.nesting[j].dimension.kind;
 
                     //nest in the correct branch color
-                    if (status === 'DEF') nestcolor = shadeColor(nestcolor, .1);
-                    else nestcolor = shadeColor(nestcolor, -.3);
+                    if (status === 'DEF') nestcolor = defbranchcolor;
+                    else nestcolor = ndefbranchcolor;
 
                     nestColors.push(nestcolor);
                 }
@@ -374,22 +369,22 @@ class VJava {
 
                 //add the colors and borders as styles to our master list
 
-                this.styles[`${selector}.${getthenbranchCssClass(node.name)}`] = `background: linear-gradient( 90deg, ${nestGradient}, ${thenbranchcolor} ${x + increment}%);`;
-                this.styles[`${selector}.${getthenbranchCssClass(node.name)}.cursor-line`] = `background: linear-gradient( 90deg, ${nestGradient}, ${thenbranchcursorcolor} ${x + increment}%);`;
-                this.styles[`${selector}.${getelsebranchCssClass(node.name)}`] = `background: linear-gradient( 90deg, ${nestGradient}, ${elsebranchcolor} ${x + increment}%);`;
-                this.styles[`${selector}.${getelsebranchCssClass(node.name)}.cursor-line`] = `background: linear-gradient( 90deg, ${nestGradient}, ${elsebranchcursorcolor} ${x + increment}%);`;
-                this.styles[`.hover-alt.${selector}.${getthenbranchCssClass(node.name)}`] = `background: linear-gradient( 90deg, ${nestGradient}, ${thenbranchcolor} ${x + increment}%);`;
-                this.styles[`.hover-alt.${selector}.${getelsebranchCssClass(node.name)}`] = `background: linear-gradient( 90deg, ${nestGradient}, ${elsebranchcolor} ${x + increment}%);`;
+                this.styles[`${selector}.${getdefbranchCssClass(node.name)}`] = `background: linear-gradient( 90deg, ${nestGradient}, ${defbranchcolor} ${x + increment}%);`;
+                this.styles[`${selector}.${getdefbranchCssClass(node.name)}.cursor-line`] = `background: linear-gradient( 90deg, ${nestGradient}, ${defbranchcursorcolor} ${x + increment}%);`;
+                this.styles[`${selector}.${getndefbranchCssClass(node.name)}`] = `background: linear-gradient( 90deg, ${nestGradient}, ${ndefbranchcolor} ${x + increment}%);`;
+                this.styles[`${selector}.${getndefbranchCssClass(node.name)}.cursor-line`] = `background: linear-gradient( 90deg, ${nestGradient}, ${ndefbranchcursorcolor} ${x + increment}%);`;
+                this.styles[`.hover-alt.${selector}.${getdefbranchCssClass(node.name)}`] = `background: linear-gradient( 90deg, ${nestGradient}, ${defbranchcolor} ${x + increment}%);`;
+                this.styles[`.hover-alt.${selector}.${getndefbranchCssClass(node.name)}`] = `background: linear-gradient( 90deg, ${nestGradient}, ${ndefbranchcolor} ${x + increment}%);`;
 
             } else {
-                this.styles[`.${getthenbranchCssClass(node.name)}`] = `background-color: ${thenbranchcolor};`;
-                this.styles[`.${getelsebranchCssClass(node.name)}`] = `background-color: ${elsebranchcolor};`;
-                this.styles[`.${getthenbranchCssClass(node.name)}.cursor-line.line`] = `background-color: ${thenbranchcursorcolor};`;
-                this.styles[`.${getelsebranchCssClass(node.name)}.cursor-line.line`] = ` background-color: ${elsebranchcursorcolor};`;
-                this.styles[`.${getthenbranchCssClass(node.name)}.line`] = `background-color: ${thenbranchhighlightcolor};`;
-                this.styles[`.${getelsebranchCssClass(node.name)}.highlight.line`] = ` background-color: ${elsebranchhighlightcolor};`;
-                this.styles[`.hover-alt.${getthenbranchCssClass(node.name)}`] = `background-color: ${thenbranchcolor};`;
-                this.styles[`.hover-alt.${getelsebranchCssClass(node.name)}`] = `background-color: ${elsebranchcolor};`;
+                this.styles[`.${getdefbranchCssClass(node.name)}`] = `background-color: ${defbranchcolor};`;
+                this.styles[`.${getndefbranchCssClass(node.name)}`] = `background-color: ${ndefbranchcolor};`;
+                this.styles[`.${getdefbranchCssClass(node.name)}.cursor-line.line`] = `background-color: ${defbranchcursorcolor};`;
+                this.styles[`.${getndefbranchCssClass(node.name)}.cursor-line.line`] = ` background-color: ${ndefbranchcursorcolor};`;
+                this.styles[`.${getdefbranchCssClass(node.name)}.line`] = `background-color: ${defbranchhighlightcolor};`;
+                this.styles[`.${getndefbranchCssClass(node.name)}.highlight.line`] = ` background-color: ${ndefbranchhighlightcolor};`;
+                this.styles[`.hover-alt.${getdefbranchCssClass(node.name)}`] = `background-color: ${defbranchcolor};`;
+                this.styles[`.hover-alt.${getndefbranchCssClass(node.name)}`] = `background-color: ${ndefbranchcolor};`;
             }
 
             //recurse thenbranch and elsebranch
@@ -510,8 +505,11 @@ class VJava {
                 this.ui.regionMarkers.push(thenbranchMarker);
 
                 //decorate with the appropriate css classes
-                editor.decorateMarker(thenbranchMarker, { type: 'line', class: getthenbranchCssClass(node.name) });
-
+                editor.decorateMarker(thenbranchMarker, { type: 'line', class: node.kind === 'positive' ? getdefbranchCssClass(node.name) : getndefbranchCssClass(node.name) });
+                thenbranchMarker.onDidDestroy(() => {
+                    this.preserveChanges(editor);
+                    this.updateEditorText();
+                });
 
                 var element = document.createElement('div');
 
@@ -526,7 +524,7 @@ class VJava {
                     element.textContent = '(+)';
                     element.classList.add(`insert-alt-${node.name}`);
                     element.classList.add(`insert-alt`);
-                    element.classList.add(getelsebranchCssClass(node.name));
+                    element.classList.add(node.kind === 'positive' ? getndefbranchCssClass(node.name) : getdefbranchCssClass(node.name));
 
                     var elseHiddenMarker = editor.markBufferPosition(node.thenbranch.span.end);
                     this.ui.markers.push(elseHiddenMarker);
@@ -536,7 +534,7 @@ class VJava {
                         vjava.preserveChanges(editor);
                         var newNode : ContentNode = {
                             type: "text",
-                            content: "\nFill in the second alternative"
+                            content: "\nFill in the second alternative\n"
                         };
                         var inserter = new AlternativeInserter(newNode, thenbranchMarker.getBufferRange().end, "elsebranch", node.name);
                         vjava.doc = inserter.rewriteDocument(vjava.doc);
@@ -546,7 +544,7 @@ class VJava {
                     element.textContent = '(...)';
                     element.classList.add(`hover-alt-${node.name}`);
                     element.classList.add(`hover-alt`);
-                    element.classList.add(getelsebranchCssClass(node.name));
+                    element.classList.add(node.kind === 'positive' ? getndefbranchCssClass(node.name) : getdefbranchCssClass(node.name));
                     this.popupListenerQueue.push({element: element, text: renderDocument(node.elsebranch) });
 
                     var elseHiddenMarker = editor.markBufferPosition(node.thenbranch.span.end);
@@ -566,10 +564,14 @@ class VJava {
             if (isBranchActive(node, getSelectionForNode(node, this.ui.activeChoices), "elsebranch") && node.elsebranch.segments.length > 0 && !node.elsebranch.hidden) {
 
                 var elsebranchMarker = editor.markBufferRange(node.elsebranch.span, {invalidate: 'surround'});
+                elsebranchMarker.onDidDestroy(() => {
+                    this.preserveChanges(editor);
+                    this.updateEditorText();
+                });
                 this.ui.regionMarkers.push(elsebranchMarker);
 
                 var element = document.createElement('div');
-                editor.decorateMarker(elsebranchMarker, { type: 'line', class: getelsebranchCssClass(node.name) });
+                editor.decorateMarker(elsebranchMarker, { type: 'line', class: node.kind === 'positive' ? getndefbranchCssClass(node.name) : getdefbranchCssClass(node.name)  });
 
                 for (var i = this.nesting.length - 1; i >= 0; i--) {
                     //nesting class format: 'nested-[DIM ID]-[BRANCH]-[LEVEL]'
@@ -583,7 +585,7 @@ class VJava {
                     element.textContent = '(+)';
                     element.classList.add(`insert-alt-${node.name}`);
                     element.classList.add(`insert-alt`);
-                    element.classList.add(getthenbranchCssClass(node.name));
+                    element.classList.add(node.kind === 'positive' ? getdefbranchCssClass(node.name) : getndefbranchCssClass(node.name));
 
                     var thenHiddenMarker = editor.markBufferPosition(node.elsebranch.span.start);
                     this.ui.markers.push(thenHiddenMarker);
@@ -603,7 +605,7 @@ class VJava {
                     element.textContent = '(...)';
                     element.classList.add(`hover-alt-${node.name}`);
                     element.classList.add(`hover-alt`);
-                    element.classList.add(getthenbranchCssClass(node.name));
+                    element.classList.add(node.kind === 'positive' ? getdefbranchCssClass(node.name) : getndefbranchCssClass(node.name));
 
                     this.popupListenerQueue.push({element: element, text: renderDocument(node.thenbranch) });
 
@@ -854,7 +856,8 @@ class VJava {
     }
 
     addChoiceSegment(dim: string, status: DimensionStatus) {
-
+        if(this.addChoiceLockout) return;
+        this.addChoiceLockout = true;
         var activeEditor = atom.workspace.getActiveTextEditor();
 
 
@@ -877,7 +880,7 @@ class VJava {
             {
                 span: null, //no idea what this will be
                 marker: null,// do this later?
-                content: '\n' + lit,
+                content: '\n' + lit + '\n',
                 type: 'text'
             }
         ];
@@ -886,6 +889,7 @@ class VJava {
         var inserter = new NodeInserter(node, location, activeEditor);
         this.doc = inserter.rewriteDocument(this.doc);
         this.updateEditorText();
+        setTimeout(() => { this.addChoiceLockout = false }, 500);
     }
 
     toggle() {

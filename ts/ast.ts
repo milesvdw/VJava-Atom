@@ -246,14 +246,14 @@ export class NodeInserter extends SyntaxRewriter {
         super();
     }
 
-    rewriteDocument(doc: RegionNode) {
-        //walk the span before and after we do the change, because spans have semantic meaning here
-        const walker = new SpanWalker();
-        walker.visitRegion(doc);
-        const newDoc = this.rewriteRegion(doc);
-        walker.visitRegion(newDoc);
-        return newDoc;
-    }
+    // rewriteDocument(doc: RegionNode) {
+    //     //walk the span before and after we do the change, because spans have semantic meaning here
+    //     const walker = new SpanWalker();
+    //     // walker.visitRegion(doc);
+    //     const newDoc = this.rewriteRegion(doc);
+    //     walker.visitRegion(newDoc);
+    //     return newDoc;
+    // }
 
     rewriteRegion(region: RegionNode): RegionNode {
         var newSegments: SegmentNode[] = []
@@ -306,8 +306,8 @@ export class AlternativeInserter extends SyntaxRewriter {
         var newelsebranch;
         const newNode: ChoiceNode = copyFromChoice(node);
 
-        if(this.branch === "elsebranch"
-            && node.elsebranch.span.end[0] === this.location.row && node.elsebranch.span.end[1] === this.location.column && node.name === this.dimension) { // if this is exactly the endpoint of the span, and the correct dimension
+        //OLD LOGIC:  && node.elsebranch.span.end[0] === this.location.row && node.elsebranch.span.end[1] === this.location.column && node.name === this.dimension
+        if(this.branch === "elsebranch") { // if this is exactly the endpoint of the span, and the correct dimension
             if(node.elsebranch.segments.length != 0) throw "This alternative already exists";
             else newelsebranch = {
                 type: "region",
@@ -333,14 +333,14 @@ export class AlternativeInserter extends SyntaxRewriter {
         return [newNode];
     }
 
-    rewriteDocument(doc: RegionNode) {
-        //walk the span before and after we do the change, because spans have semantic meaning here
-        const walker = new SpanWalker();
-        walker.visitRegion(doc);
-        const newDoc = this.rewriteRegion(doc);
-        walker.visitRegion(newDoc);
-        return newDoc;
-    }
+    // rewriteDocument(doc: RegionNode) {
+    //     //walk the span before and after we do the change, because spans have semantic meaning here
+    //     const walker = new SpanWalker();
+    //     walker.visitRegion(doc);
+    //     const newDoc = this.rewriteRegion(doc);
+    //     walker.visitRegion(newDoc);
+    //     return newDoc;
+    // }
 
     rewriteRegion(region: RegionNode): RegionNode {
         var newSegments: SegmentNode[] = []
@@ -374,7 +374,7 @@ export class EditPreserver extends SyntaxWalker {
     }
 
     visitContent(node: ContentNode): void {
-        node.content = this.editor.getTextInBufferRange(node.marker.getBufferRange());
+        node.content = this.editor.getTextInBufferRange(node.marker.getBufferRange()) + '\n'; //add back in a newline that is technically out of the range of this node. for reasons.
     }
 
     visitRegion(region: RegionNode): void {
@@ -405,7 +405,7 @@ export class EditPreserver extends SyntaxWalker {
             this.index += 1;
             var subsumed = false;
             //if the marker hasn't been invalidated, then we're good to go.
-            if(this.regionMarkers[this.index].isValid()) {
+            if(this.regionMarkers[this.index] && this.regionMarkers[this.index].isValid()) {
               recurseThen = true;
             } else {
               //on the other hand, if the marker was invalidated, we need to seriously modify this node
@@ -413,7 +413,7 @@ export class EditPreserver extends SyntaxWalker {
               //if the this-branch of a positive node was destroyed but the else-branch wasn't
               //make the node a contrapositive node, and
               //use the old else-branch as the new then-branch
-              if((node.elsebranch.segments.length > 0) && this.regionMarkers[this.index+1].isValid() || node.elsebranch.hidden) {
+              if((node.elsebranch.segments.length > 0) && (this.regionMarkers[this.index+1] && this.regionMarkers[this.index+1].isValid()) || node.elsebranch.hidden) {
                 if(node.kind === 'positive') {
                   node.kind = 'contrapositive';
                   node.thenbranch = {segments: node.elsebranch.segments, type: 'region'}
@@ -444,14 +444,14 @@ export class EditPreserver extends SyntaxWalker {
         if (isBranchActive(node, selection, "elsebranch") && !subsumed && (node.elsebranch.segments.length > 0) && !node.elsebranch.hidden) {
             this.index += 1;
             //if the marker hasn't been invalidated, then we're good to go.
-            if(this.regionMarkers[this.index].isValid()) {
+            if(this.regionMarkers[this.index] && this.regionMarkers[this.index].isValid()) {
               recurseElse = true;
             } else {
               //on the other hand, if the marker was invalidated, we need to seriously modify this node
 
               //if the else-branch of a positive node was destroyed but the then-branch wasn't
               //simply make this a single-alternative node
-              if(this.regionMarkers[this.index-1].isValid() || node.thenbranch.hidden) {
+              if((this.regionMarkers[this.index-1] && this.regionMarkers[this.index-1].isValid()) || node.thenbranch.hidden) {
                 node.elsebranch.segments = [];
               } else {
                 //in the case where both alternatives were shown, and neither marker is valid
@@ -553,7 +553,7 @@ class SimplifierRewriter extends SyntaxRewriter {
 
 function spanContainsPoint(outer: Span, inner: TextBuffer.IPoint): boolean {
     return (
-        ((outer.start[0] === inner.row && outer.start[1] < inner.column) // exclusive at the beginning, inclusive at the end
+        ((outer.start[0] === inner.row && outer.start[1] <= inner.column) // inclusive at the beginning, exclusive at the end
             ||
             (outer.start[0] < inner.row)) // if the outer span starts before the second Span
         &&
@@ -626,6 +626,6 @@ export function nodeToPlainText(acc: string, node: SegmentNode): string {
         return acc;
     }
     else {
-        return acc + node.content + '\n'; //replace the newline that we omitted from the range
+        return acc + node.content;
     }
 }
