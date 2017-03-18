@@ -240,6 +240,42 @@ export class ViewRewriter extends SyntaxRewriter {
     }
 }
 
+export class ASTSearcher {
+
+    constructor(public doc: RegionNode) {
+    }
+
+    isLocationAtStartOfSpan(location: TextBuffer.IPoint) : boolean {
+        return this.checkStartsInRegion(this.doc, location);
+    }
+
+    checkStartsInRegion(region: RegionNode, location: TextBuffer.IPoint) : boolean {
+        var found = false;
+        for (var segment of region.segments) {
+            if (spanContainsPoint(segment.span, location)) {
+                if (segment.span.start[0] === location.row && segment.span.start[1] === location.column) return true;
+                else if (segment.type === 'text') return false;
+                else return this.checkStartsInRegion(segment.thenbranch, location) || this.checkStartsInRegion(segment.elsebranch, location);
+            }
+        }
+    }
+
+    checkEndsInRegion(region: RegionNode, location: TextBuffer.IPoint) : boolean {
+        for (var segment of region.segments) {
+            if (inclusiveSpanContainsPoint(segment.span, location)) {
+                if (segment.span.end[0] === location.row && segment.span.end[1] === location.column) return true; //this means it's at the end of a span
+                else if (segment.type === 'text') return false; //if it's not at the end, and this is a text node, finish the search
+                else return this.checkEndsInRegion(segment.thenbranch, location) || this.checkEndsInRegion(segment.elsebranch, location); //not at the end of this node, but could be at the start of some subnode
+            }
+        }
+    }
+
+    isLocationAtEndOfSpan(location: TextBuffer.IPoint) : boolean {
+        return this.checkEndsInRegion(this.doc, location);
+    }
+
+}
+
 export class NodeInserter extends SyntaxRewriter {
 
     constructor(public newNode: SegmentNode, public location: TextBuffer.IPoint, public editor: AtomCore.IEditor) {
@@ -368,38 +404,44 @@ export class EditPreserver extends SyntaxWalker {
         super();
     }
 
-    visitDocument(doc: RegionNode): void {
+    visitDocument(doc: RegionNode): boolean {
       this.index = -1;
-      this.visitRegion(doc);
+      return this.visitRegion(doc);
     }
 
-    visitContent(node: ContentNode): void {
+    visitContent(node: ContentNode): boolean {
+        const oldContent = node.content;
         node.content = this.editor.getTextInBufferRange(node.marker.getBufferRange()) + '\n'; //add back in a newline that is technically out of the range of this node. for reasons.
+        return oldContent != node.content;
     }
 
-    visitRegion(region: RegionNode): void {
+    visitRegion(region: RegionNode): boolean {
         //first visit each node in the region
+        var changes = false;
         for (const node of region.segments) {
             switch (node.type) {
                 case "text":
-                    this.visitContent(node);
+                    changes = this.visitContent(node) || changes;
                     break;
                 case "choice":
-                    this.visitChoice(node);
+                    changes = this.visitChoice(node) || changes;
                     break;
             }
         }
+
         //then look for nodes which have been marked for deletion (null)
         for(var i = 0; i < region.segments.length; i ++) {
           if(region.segments[i].type == 'choice' && (region.segments[i] as ChoiceNode).delete) {
             region.segments.splice(i, 1);
           }
         }
+        return changes;
     }
 
-    visitChoice(node: ChoiceNode): void {
+    visitChoice(node: ChoiceNode): boolean {
         var recurseThen = false;
         var recurseElse = false;
+        var changes = false;
         var selection = getSelectionForNode(node, this.selections);
         if (isBranchActive(node, selection, "thenbranch") && !node.thenbranch.hidden) {
             this.index += 1;
@@ -408,6 +450,7 @@ export class EditPreserver extends SyntaxWalker {
             if(this.regionMarkers[this.index] && this.regionMarkers[this.index].isValid()) {
               recurseThen = true;
             } else {
+                changes = true;
               //on the other hand, if the marker was invalidated, we need to seriously modify this node
 
               //if the this-branch of a positive node was destroyed but the else-branch wasn't
@@ -447,6 +490,7 @@ export class EditPreserver extends SyntaxWalker {
             if(this.regionMarkers[this.index] && this.regionMarkers[this.index].isValid()) {
               recurseElse = true;
             } else {
+                changes = true;
               //on the other hand, if the marker was invalidated, we need to seriously modify this node
 
               //if the else-branch of a positive node was destroyed but the then-branch wasn't
@@ -462,8 +506,9 @@ export class EditPreserver extends SyntaxWalker {
 
             }
         }
-        if(recurseThen) this.visitRegion(node.thenbranch);
-        if(recurseElse) this.visitRegion(node.elsebranch);
+        if(recurseThen) changes = this.visitRegion(node.thenbranch) || changes;
+        if(recurseElse) changes = this.visitRegion(node.elsebranch) || changes;
+        return changes;
     }
 }
 

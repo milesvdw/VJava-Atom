@@ -6,6 +6,9 @@ TODO:
 
 -> BUG: inserting a choice above single-alternative choices messes up whitespace
 -> BUG: delete choices with only one alternative doesn't remove (+) button
+-> BUG: backspacing moves up choices
+-> TWEAK: (+) more grey
+-> TWEAK: "fill in" text change to blank line
 
 
 

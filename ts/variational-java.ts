@@ -19,7 +19,7 @@ import {
     Span, RegionNode, SegmentNode, ChoiceNode, ContentNode, renderDocument,
     docToPlainText, ViewRewriter, SpanWalker, NodeInserter, DimensionDeleter,
     EditPreserver, getSelectionForDim, getSelectionForNode, isBranchActive,
-    AlternativeInserter
+    AlternativeInserter, ASTSearcher
 } from './ast';
 import { VJavaUI, DimensionUI, Branch, Selector, NestLevel, DimensionStatus } from './ui'
 
@@ -135,6 +135,8 @@ class VJava {
     doc: RegionNode
     raw: string
     addChoiceLockout: boolean = false
+    lastCursorLocation: TextBuffer.IPoint
+    lastShowDoc: RegionNode
     popupListenerQueue: { element : HTMLElement, text: string }[]
     colorpicker: {}
     dimensionColors: {}
@@ -679,9 +681,9 @@ class VJava {
         }
     }
 
-    preserveChanges(editor: AtomCore.IEditor) {
+    preserveChanges(editor: AtomCore.IEditor) : boolean {
         var preserver: EditPreserver = new EditPreserver(editor, this.ui.activeChoices, this.ui.regionMarkers);
-        preserver.visitDocument(this.doc);
+        return preserver.visitDocument(this.doc);
     }
 
     parseVJava(textContents: string, next: () => void) {
@@ -736,6 +738,7 @@ class VJava {
     updateEditorText() {
         var editor = atom.workspace.getActiveTextEditor();
         var showDoc = new ViewRewriter(this.ui.activeChoices).rewriteDocument(this.doc);
+        this.lastShowDoc = showDoc;
         editor.setText(renderDocument(showDoc));
 
         for(var marker of this.ui.markers) {
@@ -756,6 +759,9 @@ class VJava {
         this.popupListenerQueue = [];
 
         this.updateColors(showDoc);
+
+        // $('body').keydown((event) => { return this.KeyCheck(event)});
+
     }
 
     // show the thenbranch alternative
@@ -773,7 +779,6 @@ class VJava {
 
     activate(state) {
         this.state = "parsed"
-        // TODO: load session from a file somewhere?
         this.ui = new VJavaUI(state);
 
         this.nesting = [];
@@ -804,6 +809,9 @@ class VJava {
                 'variational-java:undo': () => this.noUndoForYou()
             }));
 
+            atom.views.getView(activeEditor).addEventListener("keyup", (event) => { this.KeyUpCheck(event); });
+            atom.views.getView(activeEditor).addEventListener("keydown", (event) => { this.KeyDownCheck(event);});
+
             this.saveSubscription = activeEditor.onDidSave(this.handleDidSave.bind(this));
 
             //preserve the contents for later comparison (put, get)
@@ -813,6 +821,57 @@ class VJava {
             var pathBits = activeEditor.getPath().split('.');
             activeEditor.saveAs(pathBits.splice(0,pathBits.length-1).join('.') + '-temp-vjava.' + pathBits[pathBits.length-1]);
         });
+    }
+
+    KeyDownCheck(event) {
+        if(this.state === "parsed") {
+            //make note of the last cursor position so we can use it on keyup
+            var searcher = new ASTSearcher(this.doc);
+            var activeEditor = atom.workspace.getActiveTextEditor();
+            var location = activeEditor.getCursorBufferPosition();
+            this.lastCursorLocation = location;
+        }
+    }
+
+    KeyUpCheck(event) {
+        var KeyID = event.keyCode;
+           switch(KeyID)
+           {
+              case 8:
+                //nobackspaceforyou
+                var searcher = new ASTSearcher(this.lastShowDoc);
+                var activeEditor = atom.workspace.getActiveTextEditor();
+                if(searcher.isLocationAtStartOfSpan(this.lastCursorLocation)) {
+                    this.updateEditorText();
+                    activeEditor.setCursorBufferPosition(this.lastCursorLocation);
+                }
+                break;
+              case 46:
+                //nodeleteforyou
+                var searcher = new ASTSearcher(this.lastShowDoc);
+                var activeEditor = atom.workspace.getActiveTextEditor();
+                if(searcher.isLocationAtEndOfSpan(this.lastCursorLocation)) {
+                    this.updateEditorText();
+                    activeEditor.setCursorBufferPosition(this.lastCursorLocation);
+                }
+                break;
+              default: //if someone pressed another key besides backspace or delete, just preserve their change
+                break;
+            }
+            if(this.state === "parsed") {
+                setTimeout(() => {
+                    var activeEditor = atom.workspace.getActiveTextEditor();
+                    var location = activeEditor.getCursorBufferPosition();
+                    this.lastCursorLocation = location;
+                    
+                    if(this.preserveChanges(activeEditor)) {
+                        this.updateEditorText();
+                        activeEditor.setCursorBufferPosition(this.lastCursorLocation);
+                    }
+            }, 50);
+
+
+           }
     }
 
     getOriginalPath(path : string) : string {
