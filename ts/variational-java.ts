@@ -536,7 +536,7 @@ class VJava {
                         vjava.preserveChanges(editor);
                         var newNode : ContentNode = {
                             type: "text",
-                            content: "\nFill in the second alternative\n"
+                            content: "\n\n"
                         };
                         var inserter = new AlternativeInserter(newNode, thenbranchMarker.getBufferRange().end, "elsebranch", node.name);
                         vjava.doc = inserter.rewriteDocument(vjava.doc);
@@ -597,7 +597,7 @@ class VJava {
                         vjava.preserveChanges(editor);
                         var newNode : ContentNode = {
                             type: "text",
-                            content: "\nFill in the second alternative"
+                            content: "\n"
                         };
                         var inserter = new AlternativeInserter(newNode, elsebranchMarker.getBufferRange().start, "thenbranch", node.name);
                         vjava.doc = inserter.rewriteDocument(vjava.doc);
@@ -749,7 +749,7 @@ class VJava {
 
         this.tooltips.dispose();
 
-        for (var i = 0; i < this.doc.segments.length; i++) {
+        for (var i = 0; i < showDoc.segments.length; i++) {
             this.renderDimensionUI(editor, showDoc.segments[i]);
         }
 
@@ -835,6 +835,7 @@ class VJava {
 
     KeyUpCheck(event) {
         var KeyID = event.keyCode;
+        if(this.state === "parsed") {
            switch(KeyID)
            {
               case 8:
@@ -858,17 +859,16 @@ class VJava {
               default: //if someone pressed another key besides backspace or delete, just preserve their change
                 break;
             }
-            if(this.state === "parsed") {
                 setTimeout(() => {
                     var activeEditor = atom.workspace.getActiveTextEditor();
                     var location = activeEditor.getCursorBufferPosition();
                     this.lastCursorLocation = location;
-                    
+
                     if(this.preserveChanges(activeEditor)) {
                         this.updateEditorText();
                         activeEditor.setCursorBufferPosition(this.lastCursorLocation);
                     }
-            }, 50);
+            }, 20);
 
 
            }

@@ -4,16 +4,21 @@ TODO:
 -> BUG: dimension sidebar doesn't show up first time
 -> QUESTION: what should happen when the users 'deletes' a choice while one of the alternatives is hidden?
 
--> BUG: inserting a choice above single-alternative choices messes up whitespace
--> BUG: delete choices with only one alternative doesn't remove (+) button
--> BUG: backspacing moves up choices
--> TWEAK: (+) more grey
--> TWEAK: "fill in" text change to blank line
+
+
+
 
 
 
 
 DONE:
+
+3/27/2017
+X BUG: delete choices with only one alternative doesn't remove (+) button
+X BUG: backspacing moves up choices
+X BUG: inserting a choice above single-alternative choices messes up whitespace
+X TWEAK: (+) more grey
+X TWEAK: "fill in" text change to blank line
 
 3/17/2017
 X BUG: choices on the same level all have the same color scheme, which matches the last one

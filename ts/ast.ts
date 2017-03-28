@@ -435,6 +435,15 @@ export class EditPreserver extends SyntaxWalker {
             region.segments.splice(i, 1);
           }
         }
+
+        //then combine any adjacent text nodes
+        for( var i=0; i < region.segments.length; i ++) {
+            //if two text segments are abutting each other, simply combine them
+            if(region.segments[i].type === "text" && (i+1 < region.segments.length) && region.segments[i+1].type === "text") {
+                (region.segments[i] as ContentNode).content = (region.segments[i] as ContentNode).content + (region.segments[i+1] as ContentNode).content;
+                region.segments.splice(i+1, 1);
+            }
+        }
         return changes;
     }
 
@@ -451,36 +460,36 @@ export class EditPreserver extends SyntaxWalker {
               recurseThen = true;
             } else {
                 changes = true;
-              //on the other hand, if the marker was invalidated, we need to seriously modify this node
+                //on the other hand, if the marker was invalidated, we need to seriously modify this node
 
-              //if the this-branch of a positive node was destroyed but the else-branch wasn't
-              //make the node a contrapositive node, and
-              //use the old else-branch as the new then-branch
-              if((node.elsebranch.segments.length > 0) && (this.regionMarkers[this.index+1] && this.regionMarkers[this.index+1].isValid()) || node.elsebranch.hidden) {
-                if(node.kind === 'positive') {
-                  node.kind = 'contrapositive';
-                  node.thenbranch = {segments: node.elsebranch.segments, type: 'region'}
-                  node.elsebranch.segments = [];
-                } else if(node.kind === 'contrapositive') {
-                  //and vice versa
-                  node.kind = 'positive';
-                  node.thenbranch = {segments: node.elsebranch.segments, type: 'region'}
-                  node.elsebranch.segments = [];
+                //if the this-branch of a positive node was destroyed but the else-branch wasn't
+                //make the node a contrapositive node, and
+                //use the old else-branch as the new then-branch
+                if((node.elsebranch.segments.length > 0) && (this.regionMarkers[this.index+1] && this.regionMarkers[this.index+1].isValid()) || node.elsebranch.hidden) {
+                    if(node.kind === 'positive') {
+                      node.kind = 'contrapositive';
+                      node.thenbranch = {segments: node.elsebranch.segments, type: 'region'}
+                      node.elsebranch.segments = [];
+                    } else if(node.kind === 'contrapositive') {
+                      //and vice versa
+                      node.kind = 'positive';
+                      node.thenbranch = {segments: node.elsebranch.segments, type: 'region'}
+                      node.elsebranch.segments = [];
+                    }
+                    //increment if the other branch that was just subsumed *wasn't* hidden
+                    if(node.elsebranch.hidden == false) this.index += 1;
+
+                    //then recurse on the now-then-branch
+                    recurseThen = true;
+                } else {
+                    //in the case where both alternatives were shown, and neither marker is valid
+                    //the user has attempted to delete this entire choice node, so we mark is as null, for deletion
+                    node.delete = true;
+
                 }
-                //increment if the other branch that was just subsumed *wasn't* hidden
-                if(node.elsebranch.hidden == false) this.index += 1;
 
-                //then recurse on the now-then-branch
-                recurseThen = true;
-              } else {
-                //in the case where both alternatives were shown, and neither marker is valid
-                //the user has attempted to delete this entire choice node, so we mark is as null, for deletion
-                node.delete = true;
-
-              }
-
-              subsumed = true; // subsumed is true because in any case, we no longer need to look at the else-branch
-              this.index += 1;
+                subsumed = true; // subsumed is true because in any case, we no longer need to look at the else-branch
+                if(node.elsebranch.segments.length > 0) this.index += 1;
 
             }
         }
