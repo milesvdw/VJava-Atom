@@ -353,8 +353,8 @@ class VJava {
                     var kind = this.nesting[j].dimension.kind;
 
                     //nest in the correct branch color
-                    if (status === 'DEF') nestcolor = defbranchcolor;
-                    else nestcolor = ndefbranchcolor;
+                    if (status === 'DEF') nestcolor = shadeColor(nestcolor, .1);
+                    else nestcolor = shadeColor(nestcolor, -.3);
 
                     nestColors.push(nestcolor);
                 }
