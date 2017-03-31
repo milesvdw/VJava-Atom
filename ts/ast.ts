@@ -339,35 +339,49 @@ export class AlternativeInserter extends SyntaxRewriter {
 
     rewriteChoice(node: ChoiceNode) {
         var newthenbranch : RegionNode;
-        var newelsebranch;
+        var newelsebranch : RegionNode;
         const newNode: ChoiceNode = copyFromChoice(node);
 
-        //OLD LOGIC:  && node.elsebranch.span.end[0] === this.location.row && node.elsebranch.span.end[1] === this.location.column && node.name === this.dimension
-        if(this.branch === "elsebranch") { // if this is exactly the endpoint of the span, and the correct dimension
-            if(node.elsebranch.segments.length != 0) throw "This alternative already exists";
-            else newelsebranch = {
-                type: "region",
-                segments: [this.altNode]
+        var newThenSegments = [];
+        var newElseSegments = [];
+        var deeper = false;
+        for (var segment of node.thenbranch.segments) {
+            if (inclusiveSpanContainsPoint(segment.span, this.location)) {
+                if (segment.type === 'choice') {
+                    //in this case, the alternative will need to be inserted at a deeper node
+                    deeper = true;
+                    newThenSegments = newThenSegments.concat(this.rewriteChoice(segment));
+                } else {
+                    newThenSegments = newThenSegments.concat(this.rewriteContent(segment));
+                }
+            } else {
+                newThenSegments.push(segment);
             }
-            newthenbranch = super.rewriteRegion(node.thenbranch);
-        } else if(this.branch === "thenbranch"
-            && node.thenbranch.span.end[0] === this.location.row && node.thenbranch.span.end[1] === this.location.column && node.name === this.dimension) {
-            if(node.thenbranch.segments.length != 0) throw "This alternative already exists";
-            else newthenbranch = {
-                type: "region",
-                segments: [this.altNode]
-            }
-            newelsebranch = super.rewriteRegion(node.elsebranch);
-        } else {
-            newthenbranch = this.rewriteRegion(node.thenbranch);
-            newelsebranch = this.rewriteRegion(node.elsebranch);
         }
 
-        newNode.thenbranch = newthenbranch;
-        newNode.elsebranch = newelsebranch;
+        for (var segment of node.elsebranch.segments) {
+            if (inclusiveSpanContainsPoint(segment.span, this.location)) {
+                if (segment.type === 'choice') {
+                    deeper = true;
+                    newElseSegments = newElseSegments.concat(this.rewriteChoice(segment));
+                } else {
+                    newElseSegments = newElseSegments.concat(this.rewriteContent(segment));
+                }
+            } else {
+                newElseSegments.push(segment);
+            }
+        }
+        if (!deeper) {
+            if(node.elsebranch.segments.length != 0) throw "This alternative already exists";
+            else newElseSegments = [this.altNode];
+        }
+
+        newNode.thenbranch.segments = newThenSegments;
+        newNode.elsebranch.segments = newElseSegments;
 
         return [newNode];
     }
+
 
     // rewriteDocument(doc: RegionNode) {
     //     //walk the span before and after we do the change, because spans have semantic meaning here
