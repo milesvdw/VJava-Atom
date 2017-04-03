@@ -245,12 +245,20 @@ class VJava {
                 })
                 this.ui.contextMenu = atom.contextMenu.add({'atom-text-editor': [{label: 'Insert Choice', submenu: this.ui.menuItems}]});
 
+                var whenSelectedSub = {};
+                whenSelectedSub[`variational-java:add-choice-segment-${dimName}-selected`] = () => this.addChoiceSegment(dimName, "DEF");
+                var whenUnselectedSub = {};
+                whenUnselectedSub[`variational-java:add-choice-segment-${dimName}-unselected`] = () => this.addChoiceSegment(dimName, "NDEF");
+
+                this.subscriptions.add(atom.commands.add('atom-text-editor', whenSelectedSub));
+                this.subscriptions.add(atom.commands.add('atom-text-editor', whenUnselectedSub));
+
 
                 dimension.colorpicker = $(document.getElementById(dimension.name + '-colorpicker')).spectrum({
                     color: dimension.color,
                     preferredFormat: 'rgb'
                 }).on('change', () => {
-                    dimension.color = dimension.colorpicker.spectrum('get').toHexString();
+                    dimension.color = dimension.colorpicker.spectrum('get').toRgbString();
                     this.updateDimensionColor(dimension);
                 });
 
